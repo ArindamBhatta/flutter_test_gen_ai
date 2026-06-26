@@ -1,25 +1,43 @@
+// Scans the raw Dart source code line by line, finds where methods/classes talk to each other, and groups them by ID in that map using /putIfAbsent.
+
 import 'package:analyzer/dart/ast/ast.dart' as ast;
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:flutter_testgen/src/analyzer/declaration.dart';
+import 'package:test_gen_ai/src/analyzer/declaration.dart';
 
 class DependencyVisitor extends RecursiveAstVisitor<void> {
   final ast.Declaration astNode;
+
   final Declaration declaration;
 
+  final Map<int, List<Declaration>> dependencies;
   /* 
   dependencies = {
   44: [Declaration(id: 34, name: 'sum')],
   54: [Declaration(id: 34, name: 'sum')],
   };
  */
-  final Map<int, List<Declaration>> dependencies;
-
   const DependencyVisitor(this.astNode, this.declaration, this.dependencies);
 
   void _addDependencyById(int? id) {
     if (id == null) return;
+    //putIfAbsent acts as a smart guard. It says: "Check if this ID is already in the map. If it is not, put a fresh, empty list [] in there first. Then, hand me the list."
 
+    //Because it guarantees a list will always be returned (either the existing one or a brand new one), you can safely chain .add(declaration) right to the end of it.
+
+    /* 
+    void _addDependencyById(int? id) {
+      if (id == null) return;
+      
+   ? 1. Manually check if the list exists
+      if (!dependencies.containsKey(id)) {
+        ? 2. If it doesn't exist, create it manually
+        dependencies[id] = [];
+      }
+         ? 3. Now it is safe to add
+        dependencies[id]!.add(declaration);
+    }
+     */
     dependencies.putIfAbsent(id, () => []).add(declaration);
   }
 
@@ -37,9 +55,16 @@ class DependencyVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitSimpleIdentifier(ast.SimpleIdentifier node) {
     final Element? element = node.element;
+
     _addDependencyById(element?.id);
 
     //Why the extra PropertyAccessorElement check?
+    /* 
+    In Dart, when you read a property like user.name, Dart secretly treats name as a implicit Getter method under the hood.
+    The element?.id grabs the ID of that invisible getter method.
+    The element.variable.id goes one step deeper to grab the ID of the actual underlying variable where the data is stored. This makes sure your graph points to the true data source!
+     */
+
     if (element is PropertyAccessorElement) {
       _addDependencyById(element.variable.id);
     }
@@ -50,11 +75,25 @@ class DependencyVisitor extends RecursiveAstVisitor<void> {
   //This triggers only when an explicit assignment is happening—meaning you see an = (or +=, -=, etc.) operator.
   //Assigning a value: user.name = "Arindam";
   // Updating a variable: counter += 1;
+
+  /* 
+  This method explicitly targets lines of code where an equals sign (=) is being used to assign a value.
+    It catches things like:
+    myVariable = 10;
+    obj.score = 100;
+  
+   */
   @override
   void visitAssignmentExpression(ast.AssignmentExpression node) {
-    final element = node.writeElement;
+    final Element? element = node.writeElement;
     _addDependencyById(element?.id);
+    /* 
+Why the extra SetterElement check?
+  Just like reading uses a getter, assigning a value in Dart uses an implicit Setter method under the hood.
+    element?.id grabs the ID of that invisible setter method.
+    element.variable.id makes sure you also capture a dependency on the actual underlying variable being modified.
 
+ */
     if (element is SetterElement) {
       _addDependencyById(element.variable.id);
     }
@@ -132,8 +171,8 @@ class CompoundDependencyVisitor extends DependencyVisitor {
   @override
   void visitExtensionTypeDeclaration(ast.ExtensionTypeDeclaration node) {
     // target type of the extension type
-    // node.representation.accept(this);
+    node.representation.accept(this);
 
-    // _visitImplementsClause(node.implementsClause);
+    _visitImplementsClause(node.implementsClause);
   }
 }
