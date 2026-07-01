@@ -16,7 +16,6 @@ Future<List<Declaration>> extractDeclarations(
   String package, {
   List<String> targetFiles = const [],
 }) async {
-  _logger.info('Extracting source code declarations from $package');
   final AnalysisContextCollection collection = AnalysisContextCollection(
     includedPaths: [package],
   );
@@ -43,6 +42,8 @@ Future<List<Declaration>> extractDeclarations(
       .map((file) => file.path)
       .toList();
 
+  // print("parsing all dart files ---->: $dartFiles");
+
   // This is where the parser and visitors get called! The function sets up two empty master ledgers (maps) and loops through every single Dart file it found.
 
   final Map<int, Declaration> visitedDeclarations = <int, Declaration>{};
@@ -57,8 +58,8 @@ Future<List<Declaration>> extractDeclarations(
       filePath == '/project/lib/main.dart'
     */
   for (final String filePath in dartFiles) {
-    //An [AnalysisContext] represents the analysis environment for a file.
     /* 
+    An [AnalysisContext] represents the analysis environment for a file.
     For example, if you have:
     my_project/
         ├── lib/
@@ -72,7 +73,6 @@ Future<List<Declaration>> extractDeclarations(
     final AnalysisSession session = context.currentSession;
 
     /*
-
     1.Reads the file.
     2. Parses the Dart source into an AST.
     3. Resolves all imports.
@@ -103,21 +103,10 @@ Future<List<Declaration>> extractDeclarations(
 
     //1. resolved.unit -> it asks the analysis engine to compile the text into an Abstract Syntax Tree (resolved.unit).
     // Verification: Correct. This is the CompilationUnit node—the JavaScript-like root document DOM node representing the entire file structure.
-
     //2. visitedDeclarations -> At the end of this loop, visitedDeclarations is full of raw Declaration objects,
     // dependencies -> dependencies is full of raw target IDs screamed out by your visitors.
+
     if (resolved is ResolvedUnitResult) {
-      /* 
-      1. Loop Pass 1: lib/xyz.dart
-          The loop starts. It grabs the master map at #001 (which is currently empty) and hands it to parseCompilationUnit.
-          parser.dart reads xyz.dart, finds a class with ID 101, and writes to the map.
-          Master Map State now: { 101: ClassUser }
-      2. Loop Pass 2: lib/abc.dart
-          The loop moves to the next file. It grabs the exact same master map at #001 (which now contains 101) and hands it to parseCompilationUnit again.
-          parser.dart reads abc.dart, finds a method with ID 202, and writes to the map.  
-      ?      Master Map State now: { 101: ClassUser, 202: MethodAdd }
-      
-       */
       parseCompilationUnit(
         resolved.unit,
         visitedDeclarations,
@@ -127,17 +116,7 @@ Future<List<Declaration>> extractDeclarations(
       );
     }
   }
-  //destructuring pattern matching Nested loop
-  /* 
-  Suppose dependencies is:
-  final dependencies = {
-  '101': [decl1, decl2],
-  '102': [decl3],
-  calling dependencies.entries declarations == [decl1, decl2]
 
-};
-  
-   */
   for (final MapEntry(key: id, value: declarations) in dependencies.entries) {
     if (visitedDeclarations.containsKey(id)) {
       for (final Declaration declaration in declarations) {
@@ -151,14 +130,37 @@ Future<List<Declaration>> extractDeclarations(
 
   final List<Declaration> allDeclarations = visitedDeclarations.values.toList();
 
+  // print(
+  //   '\n 💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥 visitedDeclarations 💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥💥',
+  // );
+  // visitedDeclarations.forEach((key, value) {
+  //   print('''
+  //       key ->  $key:
+  //       Declaration(
+  //       id: ${value.id},
+  //       name: ${value.name},
+  //       startLine: ${value.startLine},
+  //       endLine: ${value.endLine},
+  //       path: ${value.path},
+  //       parent: ${value.parent})
+  //       dependencies: ${value.dependsOn}
+  //     ''');
+  // });
+
   if (targetFiles.isNotEmpty) {
     _logger.info('Filtering declarations to only include target files');
 
     final targetSet = targetFiles
         .map((file) => config.toPackageUri(File(file).uri).toString())
         .toSet();
-    return allDeclarations.where((d) => targetSet.contains(d.path)).toList();
+    return allDeclarations
+        .where(
+          (Declaration declaration) => targetSet.contains(declaration.path),
+        )
+        .toList();
   }
+
+  // print(allDeclarations);
 
   return allDeclarations;
 }

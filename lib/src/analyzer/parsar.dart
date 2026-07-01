@@ -7,10 +7,11 @@ import 'package:test_gen_ai/src/analyzer/visitor.dart';
 
 final _logger = Logger('parser');
 
+//1. iterate over every top level structure unit.declarations in the file and routes them to specific parser methods based on their types.
 void parseCompilationUnit(
   ast.CompilationUnit unit,
-  Map<int, Declaration> visitedDeclarations,
-  Map<int, List<Declaration>> dependencies,
+  Map<int, Declaration> visitedDeclarations, //*pointer
+  Map<int, List<Declaration>> dependencies, //*pointer[]
   String path,
   String content,
 ) {
@@ -21,8 +22,8 @@ void parseCompilationUnit(
       case ast.TopLevelVariableDeclaration():
         _parseTopLevelVariableDeclaration(
           member,
-          visitedDeclarations,
-          dependencies,
+          visitedDeclarations, //*pointer
+          dependencies, //*pointer
           lineInfo,
           path,
           content,
@@ -58,7 +59,8 @@ void parseCompilationUnit(
   }
 }
 
-//
+//3.Parsing Specific Structures & Calling Visitors
+//Extracts raw data (name, source code, lines, ID) and creates the Declaration object.
 Declaration _parseDeclaration(
   ast.Declaration declaration,
   LineInfo lineInfo,
@@ -81,8 +83,8 @@ Declaration _parseDeclaration(
 
  ''');
   }
-
-  return Declaration(
+  //create a new declaration object and returns it.
+  final decl = Declaration(
     declaration
         .declaredFragment!
         .element
@@ -101,10 +103,22 @@ Declaration _parseDeclaration(
     path: path,
     parent: parent,
   );
+
+  // print('''
+  //   👷 👷 👷 Created new
+  //   Declaration(
+  //     id: ${decl.id}
+  //     name: ${decl.name}
+  //     Start Line:${decl.startLine}
+  //     End Line: ${decl.endLine}
+  //     Path: ${decl.path}
+  //     Parent: ${decl.parent}
+  //   ''');
+  return decl;
 }
 
-//? Here is how the Dart analyzer separates your code into those two buckets:
 /* 
+? 2. Here is how the Dart analyzer separates your code into those two buckets:
 1. The TopLevelVariableDeclaration Bucket (The Individual Objects)
 This bucket is only for raw variables declared globally at the top of your file outside of any class.
 For example, if you open a file and just write a global variable or constant like this:
@@ -117,15 +131,15 @@ They are just loose variables out in the open. The parser sends these to _parseT
  */
 void _parseTopLevelVariableDeclaration(
   ast.TopLevelVariableDeclaration declaration,
-  Map<int, Declaration> visitedDeclarations,
-  Map<int, List<Declaration>> dependencies,
+  Map<int, Declaration> visitedDeclarations, //*pointer
+  Map<int, List<Declaration>> dependencies, //*pointer[]
   LineInfo lineInfo,
   String path,
   String content,
 ) {
   for (final ast.VariableDeclaration variable
       in declaration.variables.variables) {
-    _logger.fine(
+    _logger.info(
       'Parsing top-level variable declaration: ${variable.name.lexeme}',
     );
 
@@ -138,9 +152,10 @@ void _parseTopLevelVariableDeclaration(
       groupOffset: declaration.offset,
       groupEnd: declaration.end,
     );
-
+    //Adds it to visitedDeclarations.
     visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
 
+    //ends the variable to the visitor to scan for dependencies.
     declaration.variables.accept(
       VariableDependencyVisitor(variable, parsedDeclaration, dependencies),
     );
@@ -153,7 +168,6 @@ All classes (whether they inherit from something or not) go through _parseCompou
 The word "Compound" means "made up of several distinct parts." In programming, a compound declaration is anything that acts like a household container that holds methods, variables, or constants inside it.
 
 ClassDeclaration: Every single class you write (e.g., class Person {} or class User extends Person {}).
-
  */
 
 void _parseCompoundDeclaration(
@@ -185,6 +199,7 @@ void _parseCompoundDeclaration(
                                                    ▲
                                                    └── Stop here (signatureEnd)
  */
+
   final int compoundOffset =
       declaration.firstTokenAfterCommentAndMetadata.offset;
 
