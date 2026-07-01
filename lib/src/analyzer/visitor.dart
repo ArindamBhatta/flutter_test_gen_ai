@@ -16,53 +16,20 @@ class DependencyVisitor extends RecursiveAstVisitor<void> {
 
   void _addDependencyById(int? id) {
     if (id == null) return;
-
-    /* 
-     putIfAbsent acts as a smart guard. It says: "Check if this ID is already in the map. If it is not, put a fresh, empty list [] in there first. Then, hand me the list."
-
-    Because it guarantees a list will always be returned (either the existing one or a brand new one), you can safely chain .add(declaration) right to the end of it.
-
-    void _addDependencyById(int? id) {
-      if (id == null) return;
-      
-   ? 1. Manually check if the list exists
-      if (!dependencies.containsKey(id)) {
-        ? 2. If it doesn't exist, create it manually
-        dependencies[id] = [];
-      }
-         ? 3. Now it is safe to add
-        dependencies[id]!.add(declaration);
-    }
-     */
     dependencies.putIfAbsent(id, () => []).add(declaration);
   }
 
-  //capture type reference such as class name, type parameter.
   @override
   void visitNamedType(ast.NamedType node) {
     _addDependencyById(node.element?.id);
     super.visitNamedType(node);
   }
 
-  /* 
-   1. visitSimpleIdentifier  ->  The Consumer (Reading & Executing)
-   This triggers whenever your code uses or calls something that already exists.
-   Calling a function: addNumber()
-   Reading a property: print(user.name)
-  */
-
   @override
   void visitSimpleIdentifier(ast.SimpleIdentifier node) {
     final Element? element = node.element;
 
     _addDependencyById(element?.id);
-
-    /* 
-    Why the extra PropertyAccessorElement check?
-        In Dart, when you read a property like user.name, Dart secretly treats name as a implicit Getter method under the hood.
-        The element?.id grabs the ID of that invisible getter method.
-        The element.variable.id goes one step deeper to grab the ID of the actual underlying variable where the data is stored. This makes sure your graph points to the true data source!
-    */
 
     if (element is PropertyAccessorElement) {
       // print('''
@@ -75,31 +42,10 @@ class DependencyVisitor extends RecursiveAstVisitor<void> {
     super.visitSimpleIdentifier(node);
   }
 
-  /* 
-  2. visitAssignmentExpression -> The Modifier (Writing & Assigning)
-  This triggers only when an explicit assignment is happening—meaning you see an = (or +=, -=, etc.) operator.
-  Assigning a value: user.name = "Arindam";
-  Updating a variable: counter += 1;
-  */
-
-  /* 
-  This method explicitly targets lines of code where an equals sign (=) is being used to assign a value.
-  It catches things like:
-  myVariable = 10;
-  obj.score = 100;
-  */
-
   @override
   void visitAssignmentExpression(ast.AssignmentExpression node) {
     final Element? element = node.writeElement;
     _addDependencyById(element?.id);
-
-    /* 
-      Why the extra SetterElement check?
-      Just like reading uses a getter, assigning a value in Dart uses an implicit Setter method under the hood.
-      element?.id grabs the ID of that invisible setter method.
-      element.variable.id makes sure you also capture a dependency on the actual underlying variable being mo dified.
-    */
     if (element is SetterElement) {
       _addDependencyById(element.variable.id);
     }
@@ -126,7 +72,7 @@ class VariableDependencyVisitor extends DependencyVisitor {
 }
 
 class CompoundDependencyVisitor extends DependencyVisitor {
-  const CompoundDependencyVisitor(
+  CompoundDependencyVisitor(
     super.astNode,
     super.declaration,
     super.dependencies,

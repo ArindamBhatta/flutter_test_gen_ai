@@ -7,7 +7,6 @@ import 'package:test_gen_ai/src/analyzer/visitor.dart';
 
 final _logger = Logger('parser');
 
-//1. iterate over every top level structure unit.declarations in the file and routes them to specific parser methods based on their types.
 void parseCompilationUnit(
   ast.CompilationUnit unit,
   Map<int, Declaration> visitedDeclarations, //*pointer
@@ -59,8 +58,6 @@ void parseCompilationUnit(
   }
 }
 
-//3.Parsing Specific Structures & Calling Visitors
-//Extracts raw data (name, source code, lines, ID) and creates the Declaration object.
 Declaration _parseDeclaration(
   ast.Declaration declaration,
   LineInfo lineInfo,
@@ -85,50 +82,37 @@ Declaration _parseDeclaration(
   }
   //create a new declaration object and returns it.
   final decl = Declaration(
-    declaration
-        .declaredFragment!
-        .element
-        .id, //It assigns it a unique ID (e.g., 101).
+    declaration.declaredFragment!.element.id,
     name: name ?? '',
+
     sourceCode: content
         .substring(
           groupOffset ?? declaration.offset,
           groupEnd ?? declaration.end,
         )
         .split('\n'),
+
     startLine: lineInfo
         .getLocation(groupOffset ?? declaration.offset)
         .lineNumber,
+
     endLine: lineInfo.getLocation(groupEnd ?? declaration.end).lineNumber,
     path: path,
     parent: parent,
   );
 
   // print('''
-  //   👷 👷 👷 Created new
+  //   👷 👷 👷 Created new 👷 👷 👷
   //   Declaration(
   //     id: ${decl.id}
   //     name: ${decl.name}
-  //     Start Line:${decl.startLine}
-  //     End Line: ${decl.endLine}
+  //     sourceCode: ${decl.sourceCode}
   //     Path: ${decl.path}
-  //     Parent: ${decl.parent}
+  //     Parent: ${decl.parent?.name}
   //   ''');
   return decl;
 }
 
-/* 
-? 2. Here is how the Dart analyzer separates your code into those two buckets:
-1. The TopLevelVariableDeclaration Bucket (The Individual Objects)
-This bucket is only for raw variables declared globally at the top of your file outside of any class.
-For example, if you open a file and just write a global variable or constant like this:
-
-int globalCounter = 0;
-String apiToken = "XYZ123";
-
-These are not functions, and they are not classes.
-They are just loose variables out in the open. The parser sends these to _parseTopLevelVariableDeclaration.
- */
 void _parseTopLevelVariableDeclaration(
   ast.TopLevelVariableDeclaration declaration,
   Map<int, Declaration> visitedDeclarations, //*pointer
@@ -152,23 +136,13 @@ void _parseTopLevelVariableDeclaration(
       groupOffset: declaration.offset,
       groupEnd: declaration.end,
     );
-    //Adds it to visitedDeclarations.
     visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
 
-    //ends the variable to the visitor to scan for dependencies.
     declaration.variables.accept(
       VariableDependencyVisitor(variable, parsedDeclaration, dependencies),
     );
   }
 }
-
-/* 
-All classes (whether they inherit from something or not) go through _parseCompoundDeclaration.
-2. The CompoundDeclaration Bucket (The Households / Containers)
-The word "Compound" means "made up of several distinct parts." In programming, a compound declaration is anything that acts like a household container that holds methods, variables, or constants inside it.
-
-ClassDeclaration: Every single class you write (e.g., class Person {} or class User extends Person {}).
- */
 
 void _parseCompoundDeclaration(
   ast.CompilationUnitMember declaration,
@@ -192,13 +166,6 @@ void _parseCompoundDeclaration(
     ),
     _ => ('', []),
   };
-  /* 
-┌── Start here (compoundOffset)
-       ▼
-       class AdvancedCalculator extends Calculator {
-                                                   ▲
-                                                   └── Stop here (signatureEnd)
- */
 
   final int compoundOffset =
       declaration.firstTokenAfterCommentAndMetadata.offset;
@@ -206,6 +173,7 @@ void _parseCompoundDeclaration(
   final int signatureEnd = content.indexOf(RegExp(r'[;}]'), compoundOffset) + 1;
 
   _logger.fine('Parsing compound declaration $name');
+
   final parent = _parseDeclaration(
     declaration,
     lineInfo,
@@ -228,7 +196,7 @@ void _parseCompoundDeclaration(
     lineInfo,
     path,
     content,
-    parent,
+    parent, //passing the Parent
   );
 
   if (declaration is ast.EnumDeclaration) {
@@ -242,6 +210,27 @@ void _parseCompoundDeclaration(
       parent,
     );
   }
+}
+
+void _parseNamedCompilationUnitMember(
+  ast.NamedCompilationUnitMember member,
+  Map<int, Declaration> visitedDeclarations,
+  Map<int, List<Declaration>> dependencies,
+  LineInfo lineInfo,
+  String path,
+  String content,
+) {
+  // NamedCompilationUnitMember includes top-level functions and type aliases
+  _logger.fine('Parsing named compilation unit member: ${member.name.lexeme}');
+  final parsedDeclaration = _parseDeclaration(
+    member,
+    lineInfo,
+    path,
+    content,
+    name: member.name.lexeme,
+  );
+  visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
+  member.accept(DependencyVisitor(member, parsedDeclaration, dependencies));
 }
 
 void _parseClassMembers(
@@ -265,7 +254,7 @@ void _parseClassMembers(
           path,
           content,
           name: member.name.lexeme,
-          parent: parent,
+          parent: parent, // It assigns Calculator as the parent of sum!
         );
         break;
 
@@ -330,54 +319,3 @@ void _parseEnumConstants(
     );
   }
 }
-
-void _parseNamedCompilationUnitMember(
-  ast.NamedCompilationUnitMember member,
-  Map<int, Declaration> visitedDeclarations,
-  Map<int, List<Declaration>> dependencies,
-  LineInfo lineInfo,
-  String path,
-  String content,
-) {
-  // NamedCompilationUnitMember includes top-level functions and type aliases
-  _logger.fine('Parsing named compilation unit member: ${member.name.lexeme}');
-  final parsedDeclaration = _parseDeclaration(
-    member,
-    lineInfo,
-    path,
-    content,
-    name: member.name.lexeme,
-  );
-  visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
-  member.accept(DependencyVisitor(member, parsedDeclaration, dependencies));
-}
-
-/* 
-? 1. What is ast.CompilationUnit?
-In compiler terminology, a Compilation Unit is just a fancy name for a single Dart file.
-
-When the Dart Analyzer reads a file (e.g., main.dart), it converts that entire file into one massive tree structure called an Abstract Syntax Tree (AST). The ast.CompilationUnit object is the literal root (the base trunk) of that entire tree.
-
-In the code, ast.CompilationUnit is an object that has a property called .declarations. That property is the actual list.
- */
-
-/* 
-Summary of the AST Structure
-To visualize it cleanly, imagine the hierarchy of your data like this:
-
-ast.CompilationUnit (Object: Represents the whole file)
-    └── .declarations (The Actual List)
-    ├── ast.ClassDeclaration (Object: A class container)
-    │    └── .members (The Actual List of methods/fields inside)
-         └── ast.TopLevelVariableDeclaration (Object: A variable line)
-         └── .variables.variables (The Actual List of variables on that line)
-
-! JavaScript DOM loop
-document.querySelectorAll('div').forEach(node => { ... });
-! Dart AST loop
-for (final member in unit.declarations) { ... }
-
-Just like a JavaScript <div> object isn't an array itself but has a .childNodes array property that returns a NodeList, a Dart CompilationUnit isn't a list itself but has a .declarations property that returns a List of nodes.
-
-In both systems, the Node is the smart object containing metadata (like coordinates, types, and names), and they are bundled into standard iterable collections so you can sweep through them with a for loop.
- */
