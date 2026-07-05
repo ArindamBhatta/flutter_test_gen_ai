@@ -224,9 +224,13 @@ Future<CoverageData> formatCoverage(
           fileHits
               .key, // The String file path (e.g., 'package:my_app/user.dart')
           fileHits.value.lineHits.entries
-              .where((lineHit) => lineHit.value == 0)
-              .map((lineHit) => lineHit.key)
-              .toList(),
+              .where(
+                (lineHit) => lineHit.value == 0,
+              ) // Step 1: Keep ONLY the pairs where run count is 0
+              .map(
+                (lineHit) => lineHit.key,
+              ) // Step 2: Extract just the line number (the key)
+              .toList(), // Step 3: Turn them into a List
         ),
       )
       .where((fileHits) => fileHits.$2.isNotEmpty)
