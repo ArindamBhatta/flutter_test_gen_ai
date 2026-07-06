@@ -236,7 +236,7 @@ Future<CoverageData> formatCoverage(
       .where((fileHits) => fileHits.$2.isNotEmpty)
       .toList();
 
-  print('  Result: $result');
+  // print('  Result: $result');
   return result;
 }
 

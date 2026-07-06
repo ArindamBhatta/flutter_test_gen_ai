@@ -67,10 +67,10 @@ Future<List<Declaration>> extractDeclarations(
     }
   }
 
-  print('''
-        Map<int, Declaration> visitedDeclarations:
-        $visitedDeclarations
-        ''');
+  // print('''
+  //       Map<int, Declaration> visitedDeclarations:
+  //       $visitedDeclarations
+  //       ''');
 
   for (final MapEntry(key: id, value: declarations) in dependencies.entries) {
     if (visitedDeclarations.containsKey(id)) {

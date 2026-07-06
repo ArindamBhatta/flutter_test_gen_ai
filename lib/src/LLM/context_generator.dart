@@ -24,7 +24,7 @@ Map<Declaration?, List<Declaration>> buildDependencyContext(
     _dfs(dependency, parentMap, maxDepth: maxDepth);
   }
 
-  // Remove any declarations from the top-level list that are also keys.
+  // This line is an architectural deduplication filter. Its job is to prevent the same class or code block from being printed twice in the AI's prompt context.
   parentMap[null]?.removeWhere((decl) => parentMap.containsKey(decl));
 
   return parentMap.map<Declaration?, List<Declaration>>(
@@ -67,6 +67,22 @@ ${child.toCode()}$closing
     }
 
     if (parent != parentMap.keys.last) {
+      buffer.writeln();
+    }
+  }
+  return buffer.toString();
+}
+
+String formatDeclarations(List<Declaration> declarations) {
+  print('Formatting declarations list');
+  final buffer = StringBuffer();
+
+  for (final declaration in declarations) {
+    buffer.write('''
+$packagePathPrefix${declaration.path}
+${declaration.sourceCode.join('\n')}
+''');
+    if (declaration != declarations.last) {
       buffer.writeln();
     }
   }
