@@ -1,11 +1,13 @@
-import 'package:logging/logging.dart';
+import 'dart:collection';
+
+import 'package:collection/collection.dart';
+
 import 'package:test_gen_ai/src/analyzer/declaration.dart';
 
 const indent = '   ';
 const newLine = '\n';
 const rest = '// rest of the code...';
 const packagePathPrefix = '// Code Snippet package path: ';
-final _logger = Logger('ContextGenerator');
 
 Map<Declaration?, List<Declaration>> buildDependencyContext(
   Declaration declaration, {
@@ -16,9 +18,109 @@ Map<Declaration?, List<Declaration>> buildDependencyContext(
     'declaration: $declaration'
     'maxDepth: $maxDepth',
   );
-  final context = <Declaration?, List<Declaration>>{};
+  final parentMap = <Declaration?, Set<Declaration>>{};
 
-  for (final dependancy in declaration.dependsOn) {}
+  for (final dependency in declaration.dependsOn) {
+    _dfs(dependency, parentMap, maxDepth: maxDepth);
+  }
 
-  return context;
+  // Remove any declarations from the top-level list that are also keys.
+  parentMap[null]?.removeWhere((decl) => parentMap.containsKey(decl));
+
+  return parentMap.map<Declaration?, List<Declaration>>(
+    (parent, set) =>
+        MapEntry(parent, set.toList()..sortBy((decl) => decl.name)),
+  );
+}
+
+String formatContext(Map<Declaration?, List<Declaration>> parentMap) {
+  print('Formatting context map');
+  final buffer = StringBuffer();
+
+  for (final MapEntry(key: parent, value: children) in parentMap.entries) {
+    if (parent != null) {
+      buffer.write('''
+$packagePathPrefix${parent.path}
+${parent.toCode()}
+$indent$rest$newLine
+''');
+
+      for (final child in children) {
+        buffer.writeln('${child.sourceCode.join('\n')}$newLine');
+      }
+
+      buffer.write(''' 
+$indent$rest
+}
+''');
+    } else {
+      for (final child in children) {
+        final closing = child.toCode().endsWith('{') ? ' ... }' : '';
+        buffer.write(''' 
+$packagePathPrefix${child.path}
+${child.toCode()}$closing
+''');
+        if (child != children.last) {
+          buffer.writeln();
+        }
+      }
+    }
+
+    if (parent != parentMap.keys.last) {
+      buffer.writeln();
+    }
+  }
+  return buffer.toString();
+}
+
+String formatUntestedCode(Declaration declaration, List<int> lines) {
+  print('Formatting untested code for declaration: ${declaration.name}');
+  final markedCode = List<String>.from(declaration.sourceCode);
+
+  for (final line in lines) {
+    markedCode[line] += '$indent// UNTESTED';
+  }
+
+  final hasParent = declaration.parent != null;
+  final buffer = StringBuffer();
+  buffer.writeln('$packagePathPrefix${declaration.path}');
+
+  if (hasParent) {
+    buffer.write('''
+${declaration.parent!.toCode()}
+$indent$rest$newLine
+''');
+  }
+
+  buffer.writeln(markedCode.join('\n'));
+
+  if (hasParent) {
+    buffer.write('''
+$newLine$indent$rest
+}
+''');
+  }
+  return buffer.toString();
+}
+
+void _dfs(
+  Declaration declaration,
+  Map<Declaration?, Set<Declaration>> parentMap, {
+  int currentDepth = 1,
+  int maxDepth = 1,
+}) {
+  if (currentDepth > maxDepth) {
+    return;
+  }
+
+  parentMap.putIfAbsent(declaration.parent, () => HashSet()).add(declaration);
+
+  for (final dependency in declaration.dependsOn) {
+    _dfs(
+      dependency,
+      parentMap,
+      currentDepth: currentDepth + 1,
+      maxDepth: maxDepth,
+    );
+  }
 }
