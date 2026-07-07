@@ -5,8 +5,8 @@ import 'package:coverage/coverage.dart';
 import 'package:logging/logging.dart';
 import 'package:package_config/package_config.dart';
 import 'package:stack_trace/stack_trace.dart';
-import 'package:test_gen_ai/src/analyzer/declaration.dart';
-import 'package:test_gen_ai/src/coverage/utils.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
+import 'package:flutter_test_gen_ai/src/coverage/utils.dart';
 import 'package:path/path.dart' as path;
 
 final _logger = Logger('coverage');

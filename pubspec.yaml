@@ -1,10 +1,10 @@
-name: test_gen_ai
+name: flutter_test_gen_ai
 description: >
   An LLM-based test generation tool that generates Dart test cases for uncovered code
   using Google Gemini to improve code coverage.
 version: 0.1.0
-repository: https://github.com/AmrAhmed119/dart-testgen
-issue_tracker: https://github.com/AmrAhmed119/dart-testgen/issues
+repository: 
+issue_tracker: 
 
 environment:
   sdk: '>=3.9.0 <4.0.0'
@@ -37,4 +37,4 @@ dev_dependencies:
   test: ^1.29.0
 
 executables:
-  testgen: 
+  ft_gen: 

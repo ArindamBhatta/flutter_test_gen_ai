@@ -1,0 +1,214 @@
+import 'dart:io';
+import 'dart:math';
+
+import 'package:logging/logging.dart';
+import 'package:path/path.dart' as path;
+import 'package:flutter_test_gen_ai/src/LLM/model.dart';
+import 'package:flutter_test_gen_ai/src/LLM/prompt_generator.dart';
+import 'package:flutter_test_gen_ai/src/LLM/test_file.dart';
+import 'package:flutter_test_gen_ai/src/LLM/validator.dart';
+
+enum TestStatus { created, failed, skipped }
+
+/// Result object returned after attempting to generate tests.
+///
+/// Contains:
+/// - the generated test file,
+/// - final status of test generation,
+/// - total consumed tokens,
+/// - number of attempts made.
+class GenerationResponse {
+  GenerationResponse({
+    required this.testFile,
+    required this.status,
+    required this.tokens,
+    required this.attempts,
+  });
+
+  final TestFile testFile;
+  final TestStatus status;
+  final int tokens;
+  final int attempts;
+
+  @override
+  String toString() {
+    const String reset = '\x1b[0m';
+    const String red = '\x1b[31m';
+    const String green = '\x1b[32m';
+    const String yellow = '\x1b[33m';
+
+    return 'Test generation ended with ${switch (status) {
+          TestStatus.created => green,
+          TestStatus.skipped => yellow,
+          TestStatus.failed => red,
+        }}$status$reset and used $tokens tokens. With $attempts attempt(s) '
+        'including ${testFile.analyzerErrors} analyzer errors and '
+        '${testFile.testErrors} test errors.';
+  }
+}
+
+/// Class coordinates the LLM interaction, validation, and file writing
+/// required to generate a valid test for a Dart source code.
+class TestGenerator {
+  TestGenerator({
+    required this.model,
+    required this.packagePath,
+    this.promptGenerator = const PromptGenerator(),
+    List<Validator>? validators,
+    this.maxRetries = 5,
+    this.initialBackoff = const Duration(seconds: 32),
+    this.verbose = false,
+  }) : validators = validators ?? defaultValidators {
+    if (this.validators.every((v) => v is! TestExecutionValidator)) {
+      throw ArgumentError(
+        'The provided validators list must include an instance of '
+        'TestExecutionValidator.',
+      );
+    }
+
+    if (verbose) {
+      _logFileSink = File(
+        path.join(packagePath, 'testgen_prompts.log'),
+      ).openWrite(mode: FileMode.append);
+      _logger.info(
+        'Verbose logging enabled. LLM prompts will be logged to '
+        'testgen_prompts.log',
+      );
+    }
+  }
+
+  final GeminiModel model;
+  final String packagePath;
+  final PromptGenerator promptGenerator;
+  final List<Validator> validators;
+  final int maxRetries;
+  final Duration initialBackoff;
+  final _logger = Logger('TestGenerator');
+  final bool verbose;
+  IOSink? _logFileSink;
+
+  Future<void> dispose() async {
+    if (_logFileSink != null) {
+      await _logFileSink!.flush();
+      await _logFileSink!.close();
+    }
+  }
+
+  void _logPrompt(String prompt, String declarationName, int attemptNumber) {
+    _logFileSink!.writeln(
+      '--------------------- '
+      'Begin of Prompt ($declarationName - attempt $attemptNumber)'
+      ' ---------------------\n'
+      '$prompt\n'
+      '--------------------- End of Prompt ---------------------\n',
+    );
+    _logFileSink!.flush();
+  }
+
+  Future<ValidationResult> _runValidators(
+    TestFile testFile,
+    PromptGenerator promptGenerator,
+  ) async {
+    for (final check in validators) {
+      final checkResult = await check.validate(testFile, promptGenerator);
+      if (!checkResult.isPassed) {
+        return checkResult;
+      }
+    }
+    return ValidationResult(isPassed: true);
+  }
+
+  /// Generates a test file for the provided source code using the [model].
+  /// It takes [toBeTestedCode] as the main code to test, [contextCode] to give
+  /// the model additional context about dependencies, and [fileName] to
+  /// determine where the generated test should be saved.
+  ///
+  /// The method prompts the LLM, validates the output, retries on failure, and
+  /// returns the final [GenerationResponse].
+  Future<GenerationResponse> generate({
+    required String toBeTestedCode,
+    required String contextCode,
+    required String fileName,
+  }) async {
+    final chat = model.startChat();
+    TestStatus status = TestStatus.failed;
+    Duration backoff = initialBackoff;
+    final testFile = TestFile(packagePath, fileName);
+    String prompt = promptGenerator.testCode(toBeTestedCode, contextCode);
+
+    int attempt = 1;
+    for (; attempt <= maxRetries && status == TestStatus.failed; attempt++) {
+      _logger.info(
+        'Generating tests for $fileName (attempt $attempt of $maxRetries)',
+      );
+      if (verbose) {
+        _logPrompt(prompt, fileName, attempt);
+      }
+      try {
+        final response = await chat.sendMessage(prompt);
+
+        // reset backoff on successful response
+        backoff = initialBackoff;
+
+        if (response.needTesting) {
+          await testFile.writeTest(response.code);
+
+          final validation = await _runValidators(testFile, promptGenerator);
+
+          if (validation.isPassed) {
+            status = TestStatus.created;
+          } else {
+            prompt = validation.recoveryPrompt!;
+          }
+        } else {
+          status = TestStatus.skipped;
+        }
+      } catch (e) {
+        final errorMessage = e.toString().toLowerCase();
+
+        bool isRateLimitError =
+            errorMessage.contains('rate limit exceeded') ||
+            errorMessage.contains('you exceeded your current quota');
+
+        // Exit only if the daily quota (RPD) exceeded and prevent exiting if
+        // the quota exceeded for (RPM) or (TPM) by waiting at least a minute.
+        if (isRateLimitError && backoff.inSeconds >= 128) {
+          status = TestStatus.failed;
+          await testFile.deleteTest();
+          throw StateError(
+            'You exceeded your daily quota, try again later or change model',
+          );
+        }
+
+        if (isRateLimitError) {
+          _logger.warning(
+            'Rate limit error encountered, retrying after '
+            '${backoff.inSeconds} seconds...',
+          );
+          await Future.delayed(backoff);
+          backoff *= 2;
+          continue;
+        }
+
+        _logger.warning('Error encountered: $errorMessage');
+        prompt = promptGenerator.fixError(errorMessage);
+      }
+    }
+
+    if (status == TestStatus.failed || status == TestStatus.skipped) {
+      await testFile.deleteTest();
+    }
+
+    final tokens = await model.countTokens(chat);
+
+    final generationResponse = GenerationResponse(
+      testFile: testFile,
+      status: status,
+      tokens: tokens,
+      attempts: max(1, attempt - 1),
+    );
+    _logger.info(generationResponse);
+
+    return generationResponse;
+  }
+}

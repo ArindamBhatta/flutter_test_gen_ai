@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:test_gen_ai/src/analyzer/declaration.dart';
-import 'package:test_gen_ai/src/analyzer/extractor.dart';
-import 'package:test_gen_ai/src/coverage/coverage_collection.dart';
-import 'package:test_gen_ai/src/LLM/context_generator.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/extractor.dart';
+import 'package:flutter_test_gen_ai/src/coverage/coverage_collection.dart';
+import 'package:flutter_test_gen_ai/src/LLM/context_generator.dart';
 
 void main() async {
   final String projectPath = Directory.current.path;

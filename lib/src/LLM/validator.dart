@@ -1,0 +1,108 @@
+import 'package:logging/logging.dart';
+import 'package:flutter_test_gen_ai/src/LLM/prompt_generator.dart';
+import 'package:flutter_test_gen_ai/src/LLM/test_file.dart';
+
+/// List of standard validators that are run on generated test files.
+/// These validators must be passed before a test file is considered valid.
+final defaultValidators = List<Validator>.unmodifiable([
+  AnalysisValidator(),
+  TestExecutionValidator(),
+  FormatValidator(),
+]);
+
+class ValidationResult {
+  ValidationResult({required this.isPassed, this.recoveryPrompt});
+
+  bool isPassed;
+
+  /// Optional prompt containing instructions to fix the issue if validation
+  /// failed, This will be `null` if [isPassed] is `true`.
+  String? recoveryPrompt;
+}
+
+/// Interface for all validation checks that can be run on test files.
+abstract class Validator {
+  /// Validates a specific check on the given test file
+  ///
+  /// Returns a [ValidationResult] indicating success/failure and recovery
+  /// prompt built using [promptGen] if validation failed.
+  Future<ValidationResult> validate(
+    TestFile testFile,
+    PromptGenerator promptGen,
+  );
+}
+
+/// Validates that the generated test file has no Dart analysis errors.
+class AnalysisValidator implements Validator {
+  final _logger = Logger('AnalysisValidator');
+
+  @override
+  Future<ValidationResult> validate(
+    TestFile testFile,
+    PromptGenerator promptGen,
+  ) async {
+    final errors = await testFile.runAnalyzer();
+    final hasErrors = errors != null;
+
+    _logger.info(
+      hasErrors
+          ? '✘✘ Validation failed, syntax errors found'
+          : '✔✔ Validation passed, no syntax errors found',
+    );
+
+    return ValidationResult(
+      isPassed: !hasErrors,
+      recoveryPrompt: hasErrors ? promptGen.analysisError(errors) : null,
+    );
+  }
+}
+
+/// Validates that the generated tests executed successfully without failures.
+class TestExecutionValidator implements Validator {
+  final _logger = Logger('TestExecutionValidator');
+
+  @override
+  Future<ValidationResult> validate(
+    TestFile testFile,
+    PromptGenerator promptGen,
+  ) async {
+    final errors = await testFile.runTest();
+    final hasErrors = errors != null;
+
+    _logger.info(
+      hasErrors
+          ? '✘✘ Validation failed, test execution errors found'
+          : '✔✔ Validation passed, all tests executed successfully',
+    );
+
+    return ValidationResult(
+      isPassed: !hasErrors,
+      recoveryPrompt: hasErrors ? promptGen.testFailError(errors) : null,
+    );
+  }
+}
+
+/// Validates that the generated test file follows Dart formatting conventions.
+class FormatValidator implements Validator {
+  final _logger = Logger('FormatValidator');
+
+  @override
+  Future<ValidationResult> validate(
+    TestFile testFile,
+    PromptGenerator promptGen,
+  ) async {
+    final errors = await testFile.runFormat();
+    final hasErrors = errors != null;
+
+    _logger.info(
+      hasErrors
+          ? '✘✘ Validation failed, formatting issues found'
+          : '✔✔ Validation passed, test file is properly formatted',
+    );
+
+    return ValidationResult(
+      isPassed: !hasErrors,
+      recoveryPrompt: hasErrors ? promptGen.formatError(errors) : null,
+    );
+  }
+}
