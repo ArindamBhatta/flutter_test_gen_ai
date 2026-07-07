@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:math';
 
-import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter_test_gen_ai/src/LLM/model.dart';
 import 'package:flutter_test_gen_ai/src/LLM/prompt_generator.dart';
@@ -10,14 +9,12 @@ import 'package:flutter_test_gen_ai/src/LLM/validator.dart';
 
 enum TestStatus { created, failed, skipped }
 
-/// Result object returned after attempting to generate tests.
-///
-/// Contains:
-/// - the generated test file,
-/// - final status of test generation,
-/// - total consumed tokens,
-/// - number of attempts made.
 class GenerationResponse {
+  final TestFile testFile; // [TestFile class]
+  final TestStatus status; // status of the test generation [TestStatus enum]
+  final int tokens; // tokens consumed during test generation
+  final int attempts; // number of attempts made to generate the test
+
   GenerationResponse({
     required this.testFile,
     required this.status,
@@ -25,17 +22,12 @@ class GenerationResponse {
     required this.attempts,
   });
 
-  final TestFile testFile;
-  final TestStatus status;
-  final int tokens;
-  final int attempts;
-
   @override
   String toString() {
-    const String reset = '\x1b[0m';
-    const String red = '\x1b[31m';
-    const String green = '\x1b[32m';
-    const String yellow = '\x1b[33m';
+    const String reset = '\x1b[0m'; // reset escape code for terminal
+    const String red = '\x1b[31m'; // red escape code for terminal
+    const String green = '\x1b[32m'; // green escape code for terminal
+    const String yellow = '\x1b[33m'; // yellow escape code for terminal
 
     return 'Test generation ended with ${switch (status) {
           TestStatus.created => green,
@@ -47,9 +39,16 @@ class GenerationResponse {
   }
 }
 
-/// Class coordinates the LLM interaction, validation, and file writing
-/// required to generate a valid test for a Dart source code.
 class TestGenerator {
+  final GeminiModel model; // [GeminiModel class]
+  final String packagePath; // path to the package
+  final PromptGenerator promptGenerator; // [PromptGenerator class]
+  final List<Validator> validators; // [Validator class]
+  final int maxRetries; // max number of retries
+  final Duration initialBackoff; // initial backoff duration
+  final bool verbose; // to log prompts and test generation status
+  IOSink? _logFileSink; // sink for logging prompts
+
   TestGenerator({
     required this.model,
     required this.packagePath,
@@ -70,22 +69,12 @@ class TestGenerator {
       _logFileSink = File(
         path.join(packagePath, 'testgen_prompts.log'),
       ).openWrite(mode: FileMode.append);
-      _logger.info(
+      print(
         'Verbose logging enabled. LLM prompts will be logged to '
         'testgen_prompts.log',
       );
     }
   }
-
-  final GeminiModel model;
-  final String packagePath;
-  final PromptGenerator promptGenerator;
-  final List<Validator> validators;
-  final int maxRetries;
-  final Duration initialBackoff;
-  final _logger = Logger('TestGenerator');
-  final bool verbose;
-  IOSink? _logFileSink;
 
   Future<void> dispose() async {
     if (_logFileSink != null) {
@@ -138,9 +127,7 @@ class TestGenerator {
 
     int attempt = 1;
     for (; attempt <= maxRetries && status == TestStatus.failed; attempt++) {
-      _logger.info(
-        'Generating tests for $fileName (attempt $attempt of $maxRetries)',
-      );
+      print('Generating tests for $fileName (attempt $attempt of $maxRetries)');
       if (verbose) {
         _logPrompt(prompt, fileName, attempt);
       }
@@ -181,7 +168,7 @@ class TestGenerator {
         }
 
         if (isRateLimitError) {
-          _logger.warning(
+          print(
             'Rate limit error encountered, retrying after '
             '${backoff.inSeconds} seconds...',
           );
@@ -190,7 +177,7 @@ class TestGenerator {
           continue;
         }
 
-        _logger.warning('Error encountered: $errorMessage');
+        print('Error encountered: $errorMessage');
         prompt = promptGenerator.fixError(errorMessage);
       }
     }
@@ -207,7 +194,7 @@ class TestGenerator {
       tokens: tokens,
       attempts: max(1, attempt - 1),
     );
-    _logger.info(generationResponse);
+    print(generationResponse);
 
     return generationResponse;
   }

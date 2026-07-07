@@ -4,28 +4,29 @@ import 'package:flutter_test_gen_ai/src/LLM/test_file.dart';
 
 /// List of standard validators that are run on generated test files.
 /// These validators must be passed before a test file is considered valid.
-final defaultValidators = List<Validator>.unmodifiable([
+final List<Validator> defaultValidators = List<Validator>.unmodifiable([
   AnalysisValidator(),
   TestExecutionValidator(),
   FormatValidator(),
 ]);
 
+/// Class that holds result of any validator
 class ValidationResult {
-  ValidationResult({required this.isPassed, this.recoveryPrompt});
+  ValidationResult({
+    required this.isPassed, // validation status
+    this.recoveryPrompt, // prompt for fixing the issue
+  });
 
   bool isPassed;
 
-  /// Optional prompt containing instructions to fix the issue if validation
-  /// failed, This will be `null` if [isPassed] is `true`.
+  /// Optional prompt containing instructions to fix the issue if validation failed, This will be `null` if [isPassed] is `true`.
   String? recoveryPrompt;
 }
 
 /// Interface for all validation checks that can be run on test files.
-abstract class Validator {
-  /// Validates a specific check on the given test file
-  ///
-  /// Returns a [ValidationResult] indicating success/failure and recovery
-  /// prompt built using [promptGen] if validation failed.
+abstract interface class Validator {
+  // Validates a specific check on the given test file
+  // Returns a [ValidationResult] indicating success/failure and recovery prompt built using [promptGen] if validation failed.
   Future<ValidationResult> validate(
     TestFile testFile,
     PromptGenerator promptGen,
@@ -34,17 +35,15 @@ abstract class Validator {
 
 /// Validates that the generated test file has no Dart analysis errors.
 class AnalysisValidator implements Validator {
-  final _logger = Logger('AnalysisValidator');
-
   @override
   Future<ValidationResult> validate(
     TestFile testFile,
     PromptGenerator promptGen,
   ) async {
-    final errors = await testFile.runAnalyzer();
-    final hasErrors = errors != null;
+    final String? errors = await testFile.runAnalyzer();
+    final bool hasErrors = errors != null;
 
-    _logger.info(
+    print(
       hasErrors
           ? '✘✘ Validation failed, syntax errors found'
           : '✔✔ Validation passed, no syntax errors found',
