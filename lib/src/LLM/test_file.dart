@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/diagnostic/diagnostic.dart';
-import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
 /// Manages the lifecycle of generated test files handling all operations
@@ -13,10 +12,13 @@ import 'package:path/path.dart' as path;
 /// The test files are created in the `test/testgen/` directory within the
 /// package path provided.
 class TestFile {
-  final _logger = Logger('TestFile');
+  // path to the generated test file
   final String testFilePath;
+  // path to the package
   final String packagePath;
+  // number of analyzer errors
   int analyzerErrors = 0;
+  // number of test errors
   int testErrors = 0;
 
   // Why? It ensures all LLM-generated test files are quarantined in a specific subdirectory (test/testgen/). This keeps them isolated from the project's hand-written tests and makes bulk cleanup easy.
@@ -28,10 +30,12 @@ class TestFile {
         fileName.toLowerCase(),
       );
 
+  ///-----------------------------Write Test----------------------------------
+  // Write the generated test code to a file.
   Future<void> writeTest(String content) async {
-    _logger.info('Writing test file to $testFilePath');
-    final testFile = File(testFilePath);
-    final directory = testFile.parent;
+    print('Writing test file to $testFilePath');
+    final File testFile = File(testFilePath);
+    final Directory directory = testFile.parent;
     if (!await directory.exists()) {
       await directory.create(recursive: true);
     }
@@ -42,23 +46,22 @@ class TestFile {
     );
   }
 
+  ///-----------------------------Delete Test----------------------------------
+  // Delete the generated test file.
   Future<void> deleteTest() async {
-    _logger.info('Deleting test file at $testFilePath');
-    final testFile = File(testFilePath);
+    print('Deleting test file at $testFilePath');
+    final File testFile = File(testFilePath);
     if (await testFile.exists()) {
       await testFile.delete();
     }
   }
 
-  /// Runs a lightweight syntax check on the generated test file.
-  ///
-  /// This method **only performs syntactic validation** by parsing the file
-  /// using the Dart analyzer parser. It does **not** perform semantic analysis.
-  ///
-  /// Its purpose is to quickly reject invalid Dart syntax before executing
-  /// `dart test`, which will catch semantic and runtime errors.
+  ///-----------------------------Run Analyzer-----------------------------------
+  // Runs a lightweight syntax check on the generated test file.
+  // **only performs syntactic validation** by parsing the file
+  // using the Dart analyzer parser. It does **not** perform semantic analysis.
   Future<String?> runAnalyzer() async {
-    _logger.info('Running syntax check on $testFilePath');
+    print('Running syntax check on $testFilePath');
     final result = parseFile(
       path: testFilePath,
       featureSet: FeatureSet.latestLanguageVersion(),
@@ -75,8 +78,10 @@ class TestFile {
     return errors.isEmpty ? null : errors.join('\n');
   }
 
+  ///------------------------ Run Test-------------------------------------------
+  // Runs the generated test file using the Dart test runner.
   Future<String?> runTest() async {
-    _logger.info('Running tests in $testFilePath');
+    print('Running tests in $testFilePath');
     final result = await Process.run('dart', [
       'test',
       testFilePath,
@@ -87,8 +92,10 @@ class TestFile {
     return result.exitCode != 0 ? result.stdout.toString() : null;
   }
 
+  ///------------------------ Run Format----------------------------------------
+  //clean up spacing and indentation
   Future<String?> runFormat() async {
-    _logger.info('Formatting test file at $testFilePath');
+    print('Formatting test file at $testFilePath');
     final result = await Process.run('dart', [
       'format',
       testFilePath,

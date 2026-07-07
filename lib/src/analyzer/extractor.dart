@@ -6,9 +6,9 @@ import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
 import 'package:logging/logging.dart';
 import 'package:package_config/package_config.dart';
-import 'package:test_gen_ai/src/analyzer/declaration.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
 import 'package:path/path.dart' as path;
-import 'package:test_gen_ai/src/analyzer/parser.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/parser.dart';
 
 final _logger = Logger('analyzer');
 
