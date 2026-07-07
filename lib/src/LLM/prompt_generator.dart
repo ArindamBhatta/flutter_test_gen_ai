@@ -10,7 +10,11 @@
 class PromptGenerator {
   const PromptGenerator();
 
-  String testCode(String toBeTestedCode, String contextCode) {
+  /// method for generating prompts for test case generation
+  String testCode(
+    String toBeTestedCode, // code to be tested
+    String contextCode, // context code
+  ) {
     final buffer = StringBuffer();
 
     buffer.writeln('''
@@ -69,6 +73,7 @@ Requirements:
     return buffer.toString();
   }
 
+  // Why? Because the prompt clearly tells the LLM what to do when it encounters syntax errors. By asking it to "Fix these issues and return only the corrected, complete test code," we guide it to produce output that can be directly used to fix the original file, making the regeneration process more effective and less prone to producing unrelated suggestions.
   String analysisError(String error) {
     return '''
 The generated Dart code contains the following analyzer error(s):
@@ -79,6 +84,7 @@ Fix these issues and return only the corrected, complete test code that will pas
 ''';
   }
 
+  // Why? Because it explicitly instructs the model to "fix the test code" and "return only the corrected, complete test code that will pass all tests," leaving no ambiguity about the expected output format and goal.
   String testFailError(String error) {
     return '''
 The generated test failed with the following error(s):
@@ -89,6 +95,7 @@ Fix the test code and return only the corrected, complete test code that will pa
 ''';
   }
 
+  // Why? Because it explicitly tells the LLM to "fix these issues" and "return only the correctly formatted, complete test code," ensuring the output is immediately usable.
   String formatError(String error) {
     return '''
 The generated Dart code has formatting issues:
@@ -99,6 +106,7 @@ Fix these issues and return only the correctly formatted, complete test code.
 ''';
   }
 
+  // Why? Because it explicitly tells the LLM to "fix these issues" and "return only the corrected, complete test code," guiding it to produce output that can be directly used to fix the original file.
   String fixError(String error) {
     return '''
 An error occurred during test generation:
