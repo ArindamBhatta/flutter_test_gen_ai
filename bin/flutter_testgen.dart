@@ -1,29 +1,373 @@
+import 'dart:collection';
 import 'dart:io';
+import 'package:args/args.dart';
+import 'package:flutter_test_gen_ai/src/LLM/context_generator.dart';
+import 'package:flutter_test_gen_ai/src/LLM/model.dart';
+import 'package:flutter_test_gen_ai/src/LLM/test_generator.dart';
 import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
 import 'package:flutter_test_gen_ai/src/analyzer/extractor.dart';
 import 'package:flutter_test_gen_ai/src/coverage/coverage_collection.dart';
-import 'package:flutter_test_gen_ai/src/LLM/context_generator.dart';
+import 'package:flutter_test_gen_ai/src/coverage/utils.dart';
 import 'package:logging/logging.dart';
+import 'package:path/path.dart' as path;
+import 'package:yaml/yaml.dart';
 
-Future<void> main(List<String> args) async {
-  Logger.root.level = Level.INFO;
+final _logger = Logger('testgen');
+
+//This is a common Dart pattern for building a command-line interface (CLI) using the ArgParser class. It uses the cascade operator (..) to configure an ArgParser object.
+ArgParser _createArgParser() => ArgParser()
+  ..addOption(
+    'package',
+    defaultsTo: '.',
+    help: 'Root directory of the package to test.',
+  )
+  ..addMultiOption(
+    'target-files',
+    defaultsTo: [],
+    help: 'Limit test generation to specific dart files inside the package.',
+    valueHelp: 'lib/foo.dart,lib/src/temp.dart',
+  )
+  ..addOption(
+    'port',
+    defaultsTo: '0',
+    help: 'VM service port. Defaults to using any free port.',
+  )
+  ..addFlag(
+    'function-coverage',
+    abbr: 'f',
+    defaultsTo: false,
+    help: 'Collect function coverage info.',
+  )
+  ..addFlag(
+    'branch-coverage',
+    abbr: 'b',
+    defaultsTo: false,
+    help: 'Collect branch coverage info.',
+  )
+  ..addMultiOption(
+    'scope-output',
+    defaultsTo: [],
+    help:
+        'restrict coverage results so that only scripts that start with '
+        'the provided package path are considered. Defaults to the name of '
+        'the current package (including all subpackages, if this is a '
+        'workspace).',
+  )
+  ..addOption(
+    'model',
+    defaultsTo: 'gemini-3-flash-preview',
+    help: 'Gemini model to use for generating tests.',
+  )
+  ..addOption(
+    'api-key',
+    defaultsTo: Platform.environment['GEMINI_API_KEY'],
+    help: 'Gemini API key for authentication (or set GEMINI_API_KEY env var).',
+  )
+  ..addOption(
+    'max-depth',
+    defaultsTo: '10',
+    help: 'Maximum dependency depth for context generation.',
+  )
+  ..addOption(
+    'max-attempts',
+    defaultsTo: '5',
+    help:
+        'Maximum number of attempts to generate tests for each declaration on failure.',
+  )
+  ..addFlag(
+    'effective-tests-only',
+    abbr: 'e',
+    defaultsTo: false,
+    help:
+        'Restrict test generation to only create tests that increase coverage.',
+  )
+  ..addFlag(
+    'verbose',
+    abbr: 'v',
+    defaultsTo: false,
+    help: 'Enable verbose logging. Logs LLM prompts to a file.',
+  )
+  ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help.');
+
+class Flags {
+  final String package;
+  final List<String> targetFiles;
+  final String vmServicePort;
+  final bool branchCoverage;
+  final bool functionCoverage;
+  final Set<String> scopeOutput;
+  final String model;
+  final String apiKey;
+  final bool effectiveTestsOnly;
+  final int maxDepth;
+  final int maxAttempts;
+  final bool verbose;
+
+  const Flags({
+    required this.package,
+    required this.targetFiles,
+    required this.vmServicePort,
+    required this.branchCoverage,
+    required this.functionCoverage,
+    required this.scopeOutput,
+    required this.model,
+    required this.apiKey,
+    required this.effectiveTestsOnly,
+    required this.maxDepth,
+    required this.maxAttempts,
+    required this.verbose,
+  });
 }
 
+//
+Future<Flags> perseArgs(List<String> arguments) async {
+  //It creates an ArgParser that already knows about package, model, api-key, verbose, help, etc.
+  final ArgParser parser = _createArgParser();
 
+  final ArgResults results = parser.parse(arguments);
 
+  void printUsage() {
+    print('''
+test_gen_ai - LLM-based test generation tool
 
-//  final String projectPath = Directory.current.path;
-//   final List<Declaration> declarations = await extractDeclarations(projectPath);
+Generates Dart test cases using Google Gemini to improve code coverage.
 
-//   print('--- AI Context Output ---');
-//   print(formatDeclarations(declarations));
-//   print('-------------------------');
+Analyzes code coverage, identifies untested declarations, and creates targeted
+tests to improve coverage metrics through an iterative validation process.
 
-//   // Run the dynamic coverage layer
-//   final rawCoverage = await runTestsAndCollectCoverage(
-//     projectPath,
-//     scopeOutput: <String>{}, // Empty for now
-//   );
+Usage: testgen [OPTIONS]
 
-//   // Format the results
-//   await formatCoverage(rawCoverage, projectPath);
+${parser.usage}
+
+ ''');
+  }
+
+  Never fail(String msg) {
+    print('\n$msg\n');
+    printUsage();
+    exit(1);
+  }
+
+  if (results['help'] as bool) {
+    print(parser.usage);
+    exit(0);
+  }
+
+  final packageDir = path.normalize(
+    path.absolute(results['package'] as String),
+  );
+
+  if (!FileSystemEntity.isDirectorySync(packageDir)) {
+    fail('--package is not a valid directory.');
+  }
+  //take data from utils.dart
+  final pubspecPath = getPubspecPath(packageDir);
+  if (!File(pubspecPath).existsSync()) {
+    fail(
+      "Couldn't find $pubspecPath. Make sure this command is run in a "
+      'package directory, or pass --package to explicitly set the directory.',
+    );
+  }
+
+  final libDir = path.join(packageDir, 'lib');
+
+  final targetFiles = (results['target-files'] as List<String>).map((file) {
+    final fullPath = path.normalize(path.join(packageDir, file));
+
+    if (!file.endsWith('.dart') ||
+        !path.isWithin(libDir, fullPath) ||
+        !FileSystemEntity.isFileSync(fullPath)) {
+      fail('target-files must contain dart files exist inside lib directory');
+    }
+    return fullPath;
+  }).toList();
+
+  final scopes = results['scope-output'].isEmpty
+      ? getAllWorkspaceNames(packageDir)
+      : results['scope-output'] as List<String>;
+
+  if (scopes.length != 1) {
+    fail(
+      'Workspace support is not implemented yet. '
+      'Please specify a single package scope.',
+    );
+  }
+
+  if (results['api-key'] == null) {
+    fail(
+      'No API key provided. Please set the GEMINI_API_KEY environment variable '
+      'or use the --api-key option.',
+    );
+  }
+
+  return Flags(
+    package: packageDir,
+    targetFiles: targetFiles,
+    vmServicePort: results['port'],
+    branchCoverage: results['branch-coverage'],
+    functionCoverage: results['function-coverage'],
+    scopeOutput: scopes.toSet(),
+    model: results['model'] as String,
+    apiKey: results['api-key'] as String,
+    effectiveTestsOnly: results['effective-tests-only'] as bool,
+    maxDepth: int.parse(results['max-depth'] as String),
+    maxAttempts: int.parse(results['max-attempts'] as String),
+    verbose: results['verbose'] as bool,
+  );
+}
+
+List<String> getPackageDependencies(String package) {
+  final pubspecFile = File('$package/pubspec.yaml');
+
+  final yamlContent = loadYaml(pubspecFile.readAsStringSync());
+
+  final dependencies = yamlContent['dependencies'];
+  if (dependencies is YamlMap) {
+    return dependencies.keys.cast<String>().toList();
+  }
+
+  return [];
+}
+
+Future<void> main(List<String> arguments) async {
+  Logger.root.level = Level.INFO;
+  Logger.root.onRecord.listen((record) {
+    print(
+      '[${record.time}] [${record.loggerName}] [${record.level.name}] '
+      '${record.message}',
+    );
+  });
+
+  final flags = await perseArgs(arguments);
+  final List<String> deps = getPackageDependencies(flags.package);
+
+  if (!deps.contains('test')) {
+    final process = await Process.run('dart', [
+      'pub',
+      'add',
+      'test',
+      '--dev',
+    ], workingDirectory: flags.package);
+    if (process.exitCode != 0) {
+      _logger.shout('Failed to run dart pub add test --dev');
+      exit(1);
+    }
+  }
+
+  final Map<String, dynamic> coverage = await runTestsAndCollectCoverage(
+    flags.package,
+    vmServicePort: flags.vmServicePort,
+    branchCoverage: flags.branchCoverage,
+    functionCoverage: flags.functionCoverage,
+    scopeOutput: flags.scopeOutput,
+  );
+
+  final coverageByFile = await formatCoverage(coverage, flags.package);
+
+  final List<Declaration> declarations = await extractDeclarations(
+    flags.package,
+    targetFiles: flags.targetFiles,
+  );
+
+  final Map<String, List<Declaration>> declarationsByFile = {};
+  for (final declaration in declarations) {
+    declarationsByFile.putIfAbsent(declaration.path, () => []).add(declaration);
+  }
+
+  var untestedDeclarations = extractUntestedDeclarations(
+    declarationsByFile,
+    coverageByFile,
+  );
+
+  final model = GeminiModel(modelName: flags.model, apiKey: flags.apiKey);
+
+  final testGenerator = TestGenerator(
+    model: model,
+    packagePath: flags.package,
+    maxRetries: flags.maxAttempts,
+    verbose: flags.verbose,
+  );
+
+  final skippedOrFailedDeclarations = HashSet<int>();
+
+  untestedDeclarations.shuffle();
+
+  while (untestedDeclarations.isNotEmpty) {
+    final idx = untestedDeclarations.indexWhere(
+      (pair) => !skippedOrFailedDeclarations.contains(pair.$1.id),
+    );
+
+    if (idx == -1) {
+      break;
+    }
+
+    _logger.info(
+      'Remaining untested declarations: '
+      '${untestedDeclarations.length - skippedOrFailedDeclarations.length}',
+    );
+
+    final (declaration, lines) = untestedDeclarations[idx];
+
+    final toBeTestedCode = formatUntestedCode(declaration, lines);
+
+    final contextMap = buildDependencyContext(
+      declaration,
+      maxDepth: flags.maxDepth,
+    );
+
+    final contextCode = formatContext(contextMap);
+
+    final result = await testGenerator.generate(
+      toBeTestedCode: toBeTestedCode,
+      contextCode: contextCode,
+      fileName:
+          '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
+    );
+
+    bool isTestDeleted = result.status != TestStatus.created;
+
+    if (flags.effectiveTestsOnly && result.status == TestStatus.created) {
+      final isImproved = await validateTestCoverageImprovement(
+        declaration: declaration,
+        baselineUncoveredLines: lines.length,
+        packageDir: flags.package,
+        scopeOutput: flags.scopeOutput,
+        vmServicePort: flags.vmServicePort,
+        branchCoverage: flags.branchCoverage,
+        functionCoverage: flags.functionCoverage,
+      );
+
+      if (!isImproved) {
+        _logger.info(
+          'Generated tests for ${declaration.name} did not improve '
+          'coverage. Discarding...\n',
+        );
+        await result.testFile.deleteTest();
+        isTestDeleted = true;
+      }
+    }
+
+    final newCoverage = await runTestsAndCollectCoverage(
+      flags.package,
+      vmServicePort: flags.vmServicePort,
+      branchCoverage: flags.branchCoverage,
+      functionCoverage: flags.functionCoverage,
+      scopeOutput: flags.scopeOutput,
+      isInternalCall: true,
+    );
+
+    final newCoverageByFile = await formatCoverage(newCoverage, flags.package);
+
+    if (result.status == TestStatus.created && !isTestDeleted) {
+      untestedDeclarations = extractUntestedDeclarations(
+        declarationsByFile,
+        newCoverageByFile,
+      );
+    } else {
+      skippedOrFailedDeclarations.add(declaration.id);
+    }
+  }
+
+  await testGenerator.dispose();
+  exit(0);
+}

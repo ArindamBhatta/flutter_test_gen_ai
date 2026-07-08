@@ -4,6 +4,7 @@ import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
+import 'package:flutter_test_gen_ai/src/coverage/coverage_collection.dart';
 import 'package:logging/logging.dart';
 import 'package:package_config/package_config.dart';
 import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
@@ -99,4 +100,29 @@ Future<List<Declaration>> extractDeclarations(
   }
   // print(allDeclarations);
   return allDeclarations;
+}
+
+List<(Declaration, List<int>)> extractUntestedDeclarations(
+  Map<String, List<Declaration>> declarations,
+  CoverageData coverageResults,
+) {
+  _logger.info('Extracting untested declarations based on coverage data');
+  final untestedDeclarations = <(Declaration, List<int>)>[];
+
+  for (final (filePath, uncoveredLines) in coverageResults) {
+    final fileDeclarations = declarations[filePath] ?? [];
+    for (final declaration in fileDeclarations) {
+      final lines = <int>[];
+      for (final line in uncoveredLines) {
+        if (line >= declaration.startLine && line <= declaration.endLine) {
+          lines.add(line - declaration.startLine);
+        }
+      }
+      if (lines.isNotEmpty) {
+        untestedDeclarations.add((declaration, lines));
+      }
+    }
+  }
+
+  return untestedDeclarations;
 }
