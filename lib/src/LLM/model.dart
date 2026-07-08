@@ -12,8 +12,14 @@ class GeminiModel {
         'You are a code assistant that generates Dart test '
         'cases based on provided code snippets.',
 
+    // This tells Gemini how many different responses to generate for a single prompt.
     int candidateCount = 1,
+
+    //Lower temperature = more deterministic and Higher temperature = more creative This project generates test code. I don't want creativity.
     double temperature = 0.2,
+
+    //Filters out very unlikely token choices while keeping the output natural.
+    //This parameter ensures that the model doesn't generate irrelevant or nonsensical text by only considering the most probable tokens at each step of the generation process.
     double topP = 0.95,
   }) {
     _model = _createModel(

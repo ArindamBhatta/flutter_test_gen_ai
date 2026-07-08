@@ -366,7 +366,7 @@ Future<void> main(List<String> arguments) async {
   }
 
   // Step 5: Identify untested or partially tested declarations by cross-referencing
-  // the declarations with the baseline coverage report.
+  // with the baseline coverage report in dynamic layer.
   List<(Declaration, List<int>)> untestedDeclarations =
       extractUntestedDeclarations(declarationsByFile, coverageByFile);
 
