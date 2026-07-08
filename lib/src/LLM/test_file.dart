@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:analyzer/dart/analysis/features.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/diagnostic/diagnostic.dart';
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
 /// Manages the lifecycle of generated test files handling all operations
@@ -12,6 +13,7 @@ import 'package:path/path.dart' as path;
 /// The test files are created in the `test/testgen/` directory within the
 /// package path provided.
 class TestFile {
+  final _logger = Logger('TestFile');
   // path to the generated test file
   final String testFilePath;
   // path to the package
@@ -33,7 +35,7 @@ class TestFile {
   ///-----------------------------Write Test----------------------------------
   // Write the generated test code to a file.
   Future<void> writeTest(String content) async {
-    print('Writing test file to $testFilePath');
+    _logger.info('Writing test file to $testFilePath');
     final File testFile = File(testFilePath);
     final Directory directory = testFile.parent;
     if (!await directory.exists()) {
@@ -49,7 +51,7 @@ class TestFile {
   ///-----------------------------Delete Test----------------------------------
   // Delete the generated test file.
   Future<void> deleteTest() async {
-    print('Deleting test file at $testFilePath');
+    _logger.info('Deleting test file at $testFilePath');
     final File testFile = File(testFilePath);
     if (await testFile.exists()) {
       await testFile.delete();
@@ -61,7 +63,7 @@ class TestFile {
   // **only performs syntactic validation** by parsing the file
   // using the Dart analyzer parser. It does **not** perform semantic analysis.
   Future<String?> runAnalyzer() async {
-    print('Running syntax check on $testFilePath');
+    _logger.info('Running syntax check on $testFilePath');
     final result = parseFile(
       path: testFilePath,
       featureSet: FeatureSet.latestLanguageVersion(),
@@ -81,7 +83,7 @@ class TestFile {
   ///------------------------ Run Test-------------------------------------------
   // Runs the generated test file using the Dart test runner.
   Future<String?> runTest() async {
-    print('Running tests in $testFilePath');
+    _logger.info('Running tests in $testFilePath');
     final result = await Process.run('dart', [
       'test',
       testFilePath,
@@ -95,7 +97,7 @@ class TestFile {
   ///------------------------ Run Format----------------------------------------
   //clean up spacing and indentation
   Future<String?> runFormat() async {
-    print('Formatting test file at $testFilePath');
+    _logger.info('Formatting test file at $testFilePath');
     final result = await Process.run('dart', [
       'format',
       testFilePath,

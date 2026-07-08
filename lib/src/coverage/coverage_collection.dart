@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:coverage/coverage.dart';
@@ -44,9 +45,22 @@ Future<void> _dartRun(
     IOSink sink,
     void Function(String) onLine,
   ) {
-    final broadStream = stream.asBroadcastStream();
-    broadStream.listen(sink.add);
-    broadStream.lines().listen(onLine);
+    final lineSink = const LineSplitter().startChunkedConversion(
+      _LineSink(onLine),
+    );
+    final decodedSink = const SystemEncoding().decoder.startChunkedConversion(
+      lineSink,
+    );
+
+    stream.listen(
+      (data) {
+        sink.add(data);
+        decodedSink.add(data);
+      },
+      onDone: () {
+        decodedSink.close();
+      },
+    );
   }
 
   listen(process.stdout, stdout, onStdout);
@@ -180,7 +194,9 @@ Future<void> _generateCoverageImportFile(String packagePath) async {
       .map((file) => 'import \'${config?.toPackageUri(file.uri)}\';')
       .join('\n');
 
-  // print('Importing files are  📄📄📄📄📄📄 => $importStatements');
+  _logger.info(
+    'Dynamic layer 🎯🎯🎯🎯🎯🎯🎯 : Importing files are => $importStatements',
+  );
 
   importsFile.createSync(recursive: true);
 
@@ -236,11 +252,11 @@ Future<CoverageData> formatCoverage(
       .where((fileHits) => fileHits.$2.isNotEmpty)
       .toList();
 
-  // print('  Result: $result');
+  _logger.info('Dynamic Layer 🎯🎯🎯🎯🎯🎯🎯 : Coverage Data: $result');
   return result;
 }
 
-//Step 3:  🤔 🤔 🤔 VALIDATING CODE COVERAGE IMPROVEMENT 🤔 🤔 🤔
+//Step 3: VALIDATING CODE COVERAGE IMPROVEMENT
 
 Future<bool> validateTestCoverageImprovement({
   required Declaration declaration,
@@ -287,4 +303,15 @@ Future<bool> validateTestCoverageImprovement({
               '(baseline: $baselineUncoveredLines).',
   );
   return coverageImproved;
+}
+
+class _LineSink implements Sink<String> {
+  final void Function(String) onLine;
+  _LineSink(this.onLine);
+
+  @override
+  void add(String line) => onLine(line);
+
+  @override
+  void close() {}
 }

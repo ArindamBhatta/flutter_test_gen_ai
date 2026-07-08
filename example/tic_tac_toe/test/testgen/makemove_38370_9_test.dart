@@ -30,27 +30,26 @@ void main() {
       expect(game.makeMove(0), isFalse);
     });
 
-    test('should update board and switch player on a valid move', () {
+    test('should update the board and switch players for a valid move', () {
       final result = game.makeMove(4);
       expect(result, isTrue);
-      expect(game.board[4], equals('X'));
-      expect(game.currentPlayer, equals('O'));
+      expect(game.board[4], 'X');
+      expect(game.currentPlayer, 'O');
     });
 
     test('should set winner and isGameOver when a move wins the game', () {
-      game.board[0] = 'X';
-      game.board[1] = 'X';
+      game.board = ['X', 'X', '', 'O', 'O', '', '', '', ''];
       game.currentPlayer = 'X';
 
       final result = game.makeMove(2);
 
       expect(result, isTrue);
-      expect(game.winner, equals('X'));
+      expect(game.winner, 'X');
       expect(game.isGameOver, isTrue);
     });
 
     test(
-      'should set isGameOver when the board becomes full without a winner',
+      'should set isGameOver when a move fills the board without a winner',
       () {
         game.board = ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', ''];
         game.currentPlayer = 'X';
@@ -62,5 +61,11 @@ void main() {
         expect(game.winner, isNull);
       },
     );
+
+    test('should switch currentPlayer from O to X', () {
+      game.currentPlayer = 'O';
+      game.makeMove(0);
+      expect(game.currentPlayer, 'X');
+    });
   });
 }

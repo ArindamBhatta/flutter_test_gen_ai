@@ -4,16 +4,20 @@ import 'package:collection/collection.dart';
 
 import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
 
+import 'package:logging/logging.dart';
+
 const indent = '   ';
 const newLine = '\n';
 const rest = '// rest of the code...';
 const packagePathPrefix = '// Code Snippet package path: ';
 
+final _logger = Logger('ContextGenerator');
+
 Map<Declaration?, List<Declaration>> buildDependencyContext(
   Declaration declaration, {
   int maxDepth = 10,
 }) {
-  print(
+  _logger.info(
     'Build dependency context for'
     'declaration: $declaration'
     'maxDepth: $maxDepth',
@@ -34,7 +38,7 @@ Map<Declaration?, List<Declaration>> buildDependencyContext(
 }
 
 String formatContext(Map<Declaration?, List<Declaration>> parentMap) {
-  print('Formatting context map');
+  _logger.fine('Formatting context map');
   final buffer = StringBuffer();
 
   for (final MapEntry(key: parent, value: children) in parentMap.entries) {
@@ -74,7 +78,7 @@ ${child.toCode()}$closing
 }
 
 String formatDeclarations(List<Declaration> declarations) {
-  print('Formatting declarations list');
+  _logger.fine('Formatting declarations list');
   final buffer = StringBuffer();
 
   for (final declaration in declarations) {
@@ -90,7 +94,7 @@ ${declaration.sourceCode.join('\n')}
 }
 
 String formatUntestedCode(Declaration declaration, List<int> lines) {
-  print('Formatting untested code for declaration: ${declaration.name}');
+  _logger.fine('Formatting untested code for declaration: ${declaration.name}');
   final markedCode = List<String>.from(declaration.sourceCode);
 
   for (final line in lines) {

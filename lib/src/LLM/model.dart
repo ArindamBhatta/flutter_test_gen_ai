@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:logging/logging.dart';
 
 class GeminiModel {
   GeminiModel({
@@ -25,6 +26,7 @@ class GeminiModel {
     );
   }
   late final GenerativeModel _model;
+  final _logger = Logger('GeminiModel');
 
   String _envApiKey() {
     final apiKey = Platform.environment['GEMINI_API_KEY'];
@@ -60,7 +62,7 @@ class GeminiModel {
       requiredProperties: ['code', 'needTesting'],
     );
 
-    print(
+    _logger.info(
       'Creating Gemini model: $modelName, temperature: $temperature, '
       'topP: $topP, candidateCount: $candidateCount',
     );

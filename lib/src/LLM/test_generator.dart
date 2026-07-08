@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'dart:math';
-
+import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 import 'package:flutter_test_gen_ai/src/LLM/model.dart';
 import 'package:flutter_test_gen_ai/src/LLM/prompt_generator.dart';
@@ -46,6 +46,7 @@ class TestGenerator {
   final List<Validator> validators; // [Validator class]
   final int maxRetries; // max number of retries
   final Duration initialBackoff; // initial backoff duration
+  final _logger = Logger('TestGenerator');
   final bool verbose; // to log prompts and test generation status
   IOSink? _logFileSink; // sink for logging prompts
 
@@ -69,7 +70,7 @@ class TestGenerator {
       _logFileSink = File(
         path.join(packagePath, 'testgen_prompts.log'),
       ).openWrite(mode: FileMode.append);
-      print(
+      _logger.info(
         'Verbose logging enabled. LLM prompts will be logged to '
         'testgen_prompts.log',
       );
@@ -127,7 +128,9 @@ class TestGenerator {
 
     int attempt = 1;
     for (; attempt <= maxRetries && status == TestStatus.failed; attempt++) {
-      print('Generating tests for $fileName (attempt $attempt of $maxRetries)');
+      _logger.info(
+        'Generating tests for $fileName (attempt $attempt of $maxRetries)',
+      );
       if (verbose) {
         _logPrompt(prompt, fileName, attempt);
       }
@@ -168,7 +171,7 @@ class TestGenerator {
         }
 
         if (isRateLimitError) {
-          print(
+          _logger.warning(
             'Rate limit error encountered, retrying after '
             '${backoff.inSeconds} seconds...',
           );
@@ -177,7 +180,7 @@ class TestGenerator {
           continue;
         }
 
-        print('Error encountered: $errorMessage');
+        _logger.warning('Error encountered: $errorMessage');
         prompt = promptGenerator.fixError(errorMessage);
       }
     }
@@ -194,7 +197,7 @@ class TestGenerator {
       tokens: tokens,
       attempts: max(1, attempt - 1),
     );
-    print(generationResponse);
+    _logger.info(generationResponse);
 
     return generationResponse;
   }

@@ -5,14 +5,21 @@ import 'package:tic_tac_toe/tic_tac_toe.dart';
 
 void main() {
   group('TicTacToe.isBoardFull', () {
-    test('should return true when no empty strings are present', () {
+    test('returns true when board has no empty strings', () {
       final game = TicTacToe();
-      game.board = ['X', 'O', 'X', 'X', 'O', 'O', 'O', 'X', 'X'];
+      game.board = ['X', 'O', 'X', 'O', 'X', 'O', 'X', 'O', 'X'];
       expect(game.isBoardFull(), isTrue);
     });
-    test('should return false when empty strings are present', () {
+
+    test('returns false when board contains at least one empty string', () {
       final game = TicTacToe();
-      game.board = ['X', 'O', 'X', '', 'O', 'O', 'O', 'X', 'X'];
+      game.board = ['X', 'O', 'X', '', 'X', 'O', 'X', 'O', 'X'];
+      expect(game.isBoardFull(), isFalse);
+    });
+
+    test('returns false when board is completely empty', () {
+      final game = TicTacToe();
+      game.board = ['', '', '', '', '', '', '', '', ''];
       expect(game.isBoardFull(), isFalse);
     });
   });

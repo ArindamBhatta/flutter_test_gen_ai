@@ -35,6 +35,7 @@ abstract interface class Validator {
 
 /// Validates that the generated test file has no Dart analysis errors.
 class AnalysisValidator implements Validator {
+  final _logger = Logger('AnalysisValidator');
   @override
   Future<ValidationResult> validate(
     TestFile testFile,
@@ -43,7 +44,7 @@ class AnalysisValidator implements Validator {
     final String? errors = await testFile.runAnalyzer();
     final bool hasErrors = errors != null;
 
-    print(
+    _logger.info(
       hasErrors
           ? '✘✘ Validation failed, syntax errors found'
           : '✔✔ Validation passed, no syntax errors found',

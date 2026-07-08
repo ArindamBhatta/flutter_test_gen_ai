@@ -126,7 +126,6 @@ class Flags {
 /// Parses the CLI arguments and validates that the provided paths, settings,
 /// and API keys are correct and accessible.
 Future<Flags> perseArgs(List<String> arguments) async {
-  print('Step 1: Parsing command-line arguments...');
   //print('arguments are  🔥  🔥   🔥  🔥 $arguments'); // []
 
   //ArgParser is a class that is used to parse command-line arguments. addOption(), addFlag(), usage, parse() are some of the methods used to parse command-line arguments. Think of it like a form
@@ -155,7 +154,7 @@ ${parser.usage}
 
   // Helper function to terminate execution with an error message
   Never fail(String msg) {
-    print('\n[ERROR] $msg\n');
+    _logger.severe('ERROR: $msg');
     printUsage();
     exit(1);
   }
@@ -172,7 +171,7 @@ ${parser.usage}
   );
 
   //find the absolute path from your p.c
-  print('Step 2: Working directory resolved to: $packageDir');
+  _logger.info('Working directory resolved to: $packageDir');
 
   // Verify that the package directory exists
   if (!FileSystemEntity.isDirectorySync(packageDir)) {
@@ -211,12 +210,12 @@ ${parser.usage}
   }).toList();
 
   if (targetFiles.isNotEmpty) {
-    print(
-      'Step 3: 🔥  🔥 Restricting test generation to target files: $targetFiles',
+    _logger.info(
+      '🔥  🔥 Restricting test generation to target files: $targetFiles',
     );
   } else {
-    print(
-      'Step 3: No target files specified, using all files in lib directory $targetFiles',
+    _logger.info(
+      ' No target files specified, using all files in lib directory $targetFiles',
     );
   }
 
@@ -232,8 +231,8 @@ ${parser.usage}
     );
   }
 
-  print(
-    'Step 4:Reading the Pubspec and Retrieving the Package Name:  ${scopes.first}',
+  _logger.info(
+    'Reading the Pubspec and Retrieving the Package Name:  ${scopes.first}',
   );
 
   // Validate the presence of the Gemini API key
@@ -263,15 +262,20 @@ ${parser.usage}
 }
 
 /// Reads the `pubspec.yaml` of the target package and returns its dependencies
-/// as a list of strings.
+/// (both regular and dev dependencies) as a list of strings.
 List<String> getPackageDependencies(String package) {
   final pubspecFile = File('$package/pubspec.yaml');
   final yamlContent = loadYaml(pubspecFile.readAsStringSync());
+  final deps = <String>[];
   final dependencies = yamlContent['dependencies'];
   if (dependencies is YamlMap) {
-    return dependencies.keys.cast<String>().toList();
+    deps.addAll(dependencies.keys.cast<String>());
   }
-  return [];
+  final devDependencies = yamlContent['dev_dependencies'];
+  if (devDependencies is YamlMap) {
+    deps.addAll(devDependencies.keys.cast<String>());
+  }
+  return deps;
 }
 
 /// The main entry point of the CLI tool.
@@ -281,25 +285,40 @@ Future<void> main(List<String> arguments) async {
 
   Logger.root.onRecord.listen((record) {
     print(
-      '🚀 [${record.time}] [${record.loggerName}] [${record.level.name}] '
-      '🚀 ${record.message}',
+      '[${record.time}] [${record.loggerName}] [${record.level.name}] '
+      '[${record.message}]',
     );
   });
-
-  print('🚀 Starting Flutter AI Test Generator CLI 🚀');
 
   // Step 1: Parse arguments and configure runtime environment
   final Flags flags = await perseArgs(arguments);
 
+  _logger.info("Flags package path are ${flags.package}");
+  _logger.info("Flags vm service port are ${flags.vmServicePort}");
+  _logger.info("Flags target files are ${flags.targetFiles}");
+
+  _logger.info("Flags branch coverage are ${flags.branchCoverage}");
+  _logger.info("Flags function coverage are ${flags.functionCoverage}");
+  _logger.info("Flags scope output are ${flags.scopeOutput}");
+
+  _logger.info("Flags verbose are ${flags.verbose}");
+
+  if (flags.verbose) {
+    Logger.root.level = Level.FINE;
+  }
+
   // Step 2: Read dependencies and check if the 'test' library is installed
-  print('[FLOW] Step 2: Reading package dependencies...');
+  //🚀 Dependencies are  🚀  🚀 [path, lints, test, flutter_test_gen_ai]
+
   final List<String> deps = getPackageDependencies(flags.package);
+
+  _logger.info('Dependencies are  🚀  🚀 $deps');
 
   // The 'test' library is required to run generated tests.
   // If not found in the project's pubspec.yaml, we add it automatically.
   if (!deps.contains('test')) {
-    print(
-      '[FLOW] "test" package not found in dependencies. Running "dart pub add test --dev"...',
+    _logger.info(
+      '"test" package not found in dependencies. Running "dart pub add test --dev"...',
     );
     final process = await Process.run('dart', [
       'pub',
@@ -311,57 +330,54 @@ Future<void> main(List<String> arguments) async {
       _logger.shout('Failed to run dart pub add test --dev: ${process.stderr}');
       exit(1);
     }
-    print('[FLOW] Successfully added "test" dev dependency.');
+    _logger.info('Successfully added "test" dev dependency.');
   }
 
-  // Step 3: Run existing tests and collect baseline coverage metrics
-  print(
-    '[FLOW] Step 3: Running existing tests to collect baseline coverage...',
-  );
+  // Step 3: Start with dynamic layer. Run initial tests and get json
   final Map<String, dynamic> coverage = await runTestsAndCollectCoverage(
-    flags.package,
-    vmServicePort: flags.vmServicePort,
-    branchCoverage: flags.branchCoverage,
-    functionCoverage: flags.functionCoverage,
-    scopeOutput: flags.scopeOutput,
+    flags.package, //absolute path of the package
+    vmServicePort: flags.vmServicePort, //port number 0
+    branchCoverage: flags.branchCoverage, //[]
+    functionCoverage: flags.functionCoverage, //false
+    scopeOutput: flags.scopeOutput, //{tic_tac_toe}
   );
 
-  // Format the collected coverage into a structured structure grouped by file
-  final coverageByFile = await formatCoverage(coverage, flags.package);
-  print('[FLOW] Baseline coverage collected successfully.');
+  // Format Json to CoverageData
+  final CoverageData coverageByFile = await formatCoverage(
+    coverage,
+    flags.package,
+  );
 
-  // Step 4: Analyze source code to find all code declarations (functions, methods, classes)
-  print('[FLOW] Step 4: Analyzing package to extract code declarations...');
+  // Step 4: Start with Static layer. Extract all code declarations
   final List<Declaration> declarations = await extractDeclarations(
     flags.package,
     targetFiles: flags.targetFiles,
   );
-  print('[FLOW] Extracted ${declarations.length} declarations in total.');
+
+  _logger.info(
+    "Extracted ${declarations.length} declarations from the package",
+  );
 
   // Group the declarations by the file they belong to
   final Map<String, List<Declaration>> declarationsByFile = {};
+
   for (final declaration in declarations) {
     declarationsByFile.putIfAbsent(declaration.path, () => []).add(declaration);
   }
 
   // Step 5: Identify untested or partially tested declarations by cross-referencing
   // the declarations with the baseline coverage report.
-  print(
-    '[FLOW] Step 5: Identifying untested declarations based on coverage...',
-  );
-  var untestedDeclarations = extractUntestedDeclarations(
-    declarationsByFile,
-    coverageByFile,
-  );
-  print(
-    '[FLOW] Found ${untestedDeclarations.length} untested/partially tested declarations.',
+  List<(Declaration, List<int>)> untestedDeclarations =
+      extractUntestedDeclarations(declarationsByFile, coverageByFile);
+
+  _logger.info(
+    'Found ${untestedDeclarations.length} untested/partially tested declarations.',
   );
 
   // Step 6: Initialize Gemini model and test generation framework
-  print('[FLOW] Step 6: Initializing Google Gemini LLM wrapper...');
   final model = GeminiModel(modelName: flags.model, apiKey: flags.apiKey);
 
-  final testGenerator = TestGenerator(
+  final TestGenerator testGenerator = TestGenerator(
     model: model,
     packagePath: flags.package,
     maxRetries: flags.maxAttempts,
@@ -374,7 +390,7 @@ Future<void> main(List<String> arguments) async {
   // Shuffle untested declarations to randomize the order in which we build tests
   untestedDeclarations.shuffle();
 
-  print('[FLOW] Step 7: Starting test generation loop...');
+  _logger.info('Step 7: Starting test generation loop...');
   while (untestedDeclarations.isNotEmpty) {
     // Find the next declaration that we haven't skipped/failed yet
     final idx = untestedDeclarations.indexWhere(
@@ -383,23 +399,23 @@ Future<void> main(List<String> arguments) async {
 
     // If all remaining declarations have been skipped/failed, break the loop
     if (idx == -1) {
-      print(
-        '[FLOW] No more declarations can be processed. Terminating test generation loop.',
+      _logger.info(
+        'No more declarations can be processed. Terminating test generation loop.',
       );
       break;
     }
 
     final remainingCount =
         untestedDeclarations.length - skippedOrFailedDeclarations.length;
-    print('\n[FLOW] ====================================================');
-    print('[FLOW] Untested declarations remaining: $remainingCount');
+    _logger.info('====================================================');
+    _logger.info('Untested declarations remaining: $remainingCount');
 
     // Retrieve the declaration and the list of uncovered lines
     final (declaration, lines) = untestedDeclarations[idx];
-    print(
-      '[FLOW] Selected Target: "${declaration.name}" (ID: ${declaration.id}) in ${path.relative(declaration.path, from: flags.package)}',
+    _logger.info(
+      'Selected Target: "${declaration.name}" (ID: ${declaration.id}) in ${path.relative(declaration.path, from: flags.package)}',
     );
-    print('[FLOW] Uncovered lines for this declaration: $lines');
+    _logger.info('Uncovered lines for this declaration: $lines');
 
     // Format the code block for the selected declaration
     final toBeTestedCode = formatUntestedCode(declaration, lines);
@@ -407,8 +423,8 @@ Future<void> main(List<String> arguments) async {
     // Step 7a: Collect references & dependencies of this declaration (BFS/DFS traversal of AST)
     // This gives the LLM context about other classes/methods used by this code, enabling it
     // to write valid tests without mock errors.
-    print(
-      '[FLOW] Analyzing dependency context for "${declaration.name}" up to depth of ${flags.maxDepth}...',
+    _logger.info(
+      'Analyzing dependency context for "${declaration.name}" up to depth of ${flags.maxDepth}...',
     );
     final contextMap = buildDependencyContext(
       declaration,
@@ -417,10 +433,10 @@ Future<void> main(List<String> arguments) async {
 
     // Format context mapping for injection into the LLM prompt
     final contextCode = formatContext(contextMap);
-    print('[FLOW] Dependency context generated successfully.');
+    _logger.info('Dependency context generated successfully.');
 
     // Step 7b: Query the LLM to generate tests
-    print('[FLOW] Sending request to Gemini LLM to generate tests...');
+    _logger.info('Sending request to Gemini LLM to generate tests...');
     final result = await testGenerator.generate(
       toBeTestedCode: toBeTestedCode,
       contextCode: contextCode,
@@ -428,14 +444,14 @@ Future<void> main(List<String> arguments) async {
           '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
     );
 
-    print('[FLOW] LLM response received. Status: ${result.status}');
+    _logger.info('LLM response received. Status: ${result.status}');
     bool isTestDeleted = result.status != TestStatus.created;
 
     // Step 7c: If --effective-tests-only is enabled, we run the suite and verify
     // if code coverage actually improved. If it didn't, we discard the generated test file.
     if (flags.effectiveTestsOnly && result.status == TestStatus.created) {
-      print(
-        '[FLOW] Validation: Checking if the generated test increases code coverage...',
+      _logger.info(
+        'Validation: Checking if the generated test increases code coverage...',
       );
       final isImproved = await validateTestCoverageImprovement(
         declaration: declaration,
@@ -448,20 +464,20 @@ Future<void> main(List<String> arguments) async {
       );
 
       if (!isImproved) {
-        print(
-          '[FLOW] Validation Outcome: Test did not improve coverage. Deleting generated test file.',
+        _logger.info(
+          'Validation Outcome: Test did not improve coverage. Deleting generated test file.',
         );
         await result.testFile.deleteTest();
         isTestDeleted = true;
       } else {
-        print(
-          '[FLOW] Validation Outcome: Success! Code coverage increased. Keeping test file: ${result.testFile.testFilePath}',
+        _logger.info(
+          'Validation Outcome: Success! Code coverage increased. Keeping test file: ${result.testFile.testFilePath}',
         );
       }
     }
 
     // Step 7d: Re-run tests to collect updated coverage map
-    print('[FLOW] Re-running tests to collect new coverage metrics...');
+    _logger.info('Re-running tests to collect new coverage metrics...');
     final newCoverage = await runTestsAndCollectCoverage(
       flags.package,
       vmServicePort: flags.vmServicePort,
@@ -475,8 +491,8 @@ Future<void> main(List<String> arguments) async {
 
     // If the test was successfully kept, update our listing of untested declarations
     if (result.status == TestStatus.created && !isTestDeleted) {
-      print(
-        '[FLOW] Updating list of untested declarations with new coverage data.',
+      _logger.info(
+        'Updating list of untested declarations with new coverage data.',
       );
       untestedDeclarations = extractUntestedDeclarations(
         declarationsByFile,
@@ -484,16 +500,16 @@ Future<void> main(List<String> arguments) async {
       );
     } else {
       // Otherwise mark this declaration as skipped/failed to avoid trying it again
-      print(
-        '[FLOW] Marking declaration "${declaration.name}" as skipped/failed to avoid re-tries.',
+      _logger.info(
+        'Marking declaration "${declaration.name}" as skipped/failed to avoid re-tries.',
       );
       skippedOrFailedDeclarations.add(declaration.id);
     }
   }
 
   // Clean up test generator resources
-  print('[FLOW] Step 8: Disposing test generator and cleaning up...');
+  _logger.info('Step 8: Disposing test generator and cleaning up...');
   await testGenerator.dispose();
-  print('[FLOW] Process finished successfully.');
+  _logger.info('Process finished successfully.');
   exit(0);
 }
