@@ -12,9 +12,11 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
+// Create a logger instance for structured logging output
 final _logger = Logger('testgen');
 
-//This is a common Dart pattern for building a command-line interface (CLI) using the ArgParser class. It uses the cascade operator (..) to configure an ArgParser object.
+/// Helper function to configure the command-line argument parser (ArgParser).
+/// Defines all the flags and options that can be passed to the CLI.
 ArgParser _createArgParser() => ArgParser()
   ..addOption(
     'package',
@@ -48,7 +50,7 @@ ArgParser _createArgParser() => ArgParser()
     'scope-output',
     defaultsTo: [],
     help:
-        'restrict coverage results so that only scripts that start with '
+        'Restrict coverage results so that only scripts that start with '
         'the provided package path are considered. Defaults to the name of '
         'the current package (including all subpackages, if this is a '
         'workspace).',
@@ -89,6 +91,8 @@ ArgParser _createArgParser() => ArgParser()
   )
   ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help.');
 
+/// A container class that holds all configuration values parsed from
+/// the command-line arguments.
 class Flags {
   final String package;
   final List<String> targetFiles;
@@ -119,13 +123,21 @@ class Flags {
   });
 }
 
-//
+/// Parses the CLI arguments and validates that the provided paths, settings,
+/// and API keys are correct and accessible.
 Future<Flags> perseArgs(List<String> arguments) async {
-  //It creates an ArgParser that already knows about package, model, api-key, verbose, help, etc.
+  print('Step 1: Parsing command-line arguments...');
+  //print('arguments are  🔥  🔥   🔥  🔥 $arguments'); // []
+
+  //ArgParser is a class that is used to parse command-line arguments. addOption(), addFlag(), usage, parse() are some of the methods used to parse command-line arguments. Think of it like a form
   final ArgParser parser = _createArgParser();
 
+  //ArgResults is an object that contains the parsed command-line arguments. ArgResults is the parsed output after the user provides arguments. The submitted form
   final ArgResults results = parser.parse(arguments);
 
+  // print('form fields are  🔥  🔥   🔥  🔥 ${parser.usage}');
+
+  // Helper function to print usage information
   void printUsage() {
     print('''
 test_gen_ai - LLM-based test generation tool
@@ -138,30 +150,39 @@ tests to improve coverage metrics through an iterative validation process.
 Usage: testgen [OPTIONS]
 
 ${parser.usage}
-
  ''');
   }
 
+  // Helper function to terminate execution with an error message
   Never fail(String msg) {
-    print('\n$msg\n');
+    print('\n[ERROR] $msg\n');
     printUsage();
     exit(1);
   }
 
+  // If user requested --help, print usage instructions and exit successfully
   if (results['help'] as bool) {
-    print(parser.usage);
+    printUsage();
     exit(0);
   }
 
-  final packageDir = path.normalize(
+  // Normalize the package path to get an absolute path
+  final String packageDir = path.normalize(
     path.absolute(results['package'] as String),
   );
 
+  //find the absolute path from your p.c
+  print('Step 2: Working directory resolved to: $packageDir');
+
+  // Verify that the package directory exists
   if (!FileSystemEntity.isDirectorySync(packageDir)) {
     fail('--package is not a valid directory.');
   }
-  //take data from utils.dart
-  final pubspecPath = getPubspecPath(packageDir);
+
+  // Find and verify the pubspec.yaml file inside the package
+  final String pubspecPath = getPubspecPath(packageDir);
+
+  // Make sure the pubspec.yaml file exists.
   if (!File(pubspecPath).existsSync()) {
     fail(
       "Couldn't find $pubspecPath. Make sure this command is run in a "
@@ -169,12 +190,19 @@ ${parser.usage}
     );
   }
 
-  final libDir = path.join(packageDir, 'lib');
+  final String libDir = path.join(packageDir, 'lib');
 
-  final targetFiles = (results['target-files'] as List<String>).map((file) {
-    final fullPath = path.normalize(path.join(packageDir, file));
+  // print(' Locates the Library Directory: $libDir');
 
+  // If you run it without target-files: dart run bin/flutter_testgen.dart.   Then targetFiles will be empty ([]). It goes to the else block:
+  final List<String>
+  targetFiles = (results['target-files'] as List<String>).map((String file) {
+    //child path
+    final String fullPath = path.normalize(path.join(packageDir, file));
+
+    // Ensure target files are valid Dart files and located inside the lib/ folder
     if (!file.endsWith('.dart') ||
+        //libDir/a.dart => true
         !path.isWithin(libDir, fullPath) ||
         !FileSystemEntity.isFileSync(fullPath)) {
       fail('target-files must contain dart files exist inside lib directory');
@@ -182,7 +210,18 @@ ${parser.usage}
     return fullPath;
   }).toList();
 
-  final scopes = results['scope-output'].isEmpty
+  if (targetFiles.isNotEmpty) {
+    print(
+      'Step 3: 🔥  🔥 Restricting test generation to target files: $targetFiles',
+    );
+  } else {
+    print(
+      'Step 3: No target files specified, using all files in lib directory $targetFiles',
+    );
+  }
+
+  // Determine the workspace/package scopes
+  final List<String> scopes = results['scope-output'].isEmpty
       ? getAllWorkspaceNames(packageDir)
       : results['scope-output'] as List<String>;
 
@@ -193,13 +232,20 @@ ${parser.usage}
     );
   }
 
-  if (results['api-key'] == null) {
+  print(
+    'Step 4:Reading the Pubspec and Retrieving the Package Name:  ${scopes.first}',
+  );
+
+  // Validate the presence of the Gemini API key
+  final apiKey = results['api-key'];
+  if (apiKey == null || (apiKey as String).isEmpty) {
     fail(
       'No API key provided. Please set the GEMINI_API_KEY environment variable '
       'or use the --api-key option.',
     );
   }
 
+  // Return a structured Flags object with all the verified parameters
   return Flags(
     package: packageDir,
     targetFiles: targetFiles,
@@ -216,32 +262,45 @@ ${parser.usage}
   );
 }
 
+/// Reads the `pubspec.yaml` of the target package and returns its dependencies
+/// as a list of strings.
 List<String> getPackageDependencies(String package) {
   final pubspecFile = File('$package/pubspec.yaml');
-
   final yamlContent = loadYaml(pubspecFile.readAsStringSync());
-
   final dependencies = yamlContent['dependencies'];
   if (dependencies is YamlMap) {
     return dependencies.keys.cast<String>().toList();
   }
-
   return [];
 }
 
+/// The main entry point of the CLI tool.
 Future<void> main(List<String> arguments) async {
+  // Set up logging to output to stdout
   Logger.root.level = Level.INFO;
+
   Logger.root.onRecord.listen((record) {
     print(
-      '[${record.time}] [${record.loggerName}] [${record.level.name}] '
-      '${record.message}',
+      '🚀 [${record.time}] [${record.loggerName}] [${record.level.name}] '
+      '🚀 ${record.message}',
     );
   });
 
-  final flags = await perseArgs(arguments);
+  print('🚀 Starting Flutter AI Test Generator CLI 🚀');
+
+  // Step 1: Parse arguments and configure runtime environment
+  final Flags flags = await perseArgs(arguments);
+
+  // Step 2: Read dependencies and check if the 'test' library is installed
+  print('[FLOW] Step 2: Reading package dependencies...');
   final List<String> deps = getPackageDependencies(flags.package);
 
+  // The 'test' library is required to run generated tests.
+  // If not found in the project's pubspec.yaml, we add it automatically.
   if (!deps.contains('test')) {
+    print(
+      '[FLOW] "test" package not found in dependencies. Running "dart pub add test --dev"...',
+    );
     final process = await Process.run('dart', [
       'pub',
       'add',
@@ -249,11 +308,16 @@ Future<void> main(List<String> arguments) async {
       '--dev',
     ], workingDirectory: flags.package);
     if (process.exitCode != 0) {
-      _logger.shout('Failed to run dart pub add test --dev');
+      _logger.shout('Failed to run dart pub add test --dev: ${process.stderr}');
       exit(1);
     }
+    print('[FLOW] Successfully added "test" dev dependency.');
   }
 
+  // Step 3: Run existing tests and collect baseline coverage metrics
+  print(
+    '[FLOW] Step 3: Running existing tests to collect baseline coverage...',
+  );
   final Map<String, dynamic> coverage = await runTestsAndCollectCoverage(
     flags.package,
     vmServicePort: flags.vmServicePort,
@@ -262,23 +326,39 @@ Future<void> main(List<String> arguments) async {
     scopeOutput: flags.scopeOutput,
   );
 
+  // Format the collected coverage into a structured structure grouped by file
   final coverageByFile = await formatCoverage(coverage, flags.package);
+  print('[FLOW] Baseline coverage collected successfully.');
 
+  // Step 4: Analyze source code to find all code declarations (functions, methods, classes)
+  print('[FLOW] Step 4: Analyzing package to extract code declarations...');
   final List<Declaration> declarations = await extractDeclarations(
     flags.package,
     targetFiles: flags.targetFiles,
   );
+  print('[FLOW] Extracted ${declarations.length} declarations in total.');
 
+  // Group the declarations by the file they belong to
   final Map<String, List<Declaration>> declarationsByFile = {};
   for (final declaration in declarations) {
     declarationsByFile.putIfAbsent(declaration.path, () => []).add(declaration);
   }
 
+  // Step 5: Identify untested or partially tested declarations by cross-referencing
+  // the declarations with the baseline coverage report.
+  print(
+    '[FLOW] Step 5: Identifying untested declarations based on coverage...',
+  );
   var untestedDeclarations = extractUntestedDeclarations(
     declarationsByFile,
     coverageByFile,
   );
+  print(
+    '[FLOW] Found ${untestedDeclarations.length} untested/partially tested declarations.',
+  );
 
+  // Step 6: Initialize Gemini model and test generation framework
+  print('[FLOW] Step 6: Initializing Google Gemini LLM wrapper...');
   final model = GeminiModel(modelName: flags.model, apiKey: flags.apiKey);
 
   final testGenerator = TestGenerator(
@@ -288,35 +368,59 @@ Future<void> main(List<String> arguments) async {
     verbose: flags.verbose,
   );
 
+  // Keep track of declarations that failed or were skipped to avoid infinite loops
   final skippedOrFailedDeclarations = HashSet<int>();
 
+  // Shuffle untested declarations to randomize the order in which we build tests
   untestedDeclarations.shuffle();
 
+  print('[FLOW] Step 7: Starting test generation loop...');
   while (untestedDeclarations.isNotEmpty) {
+    // Find the next declaration that we haven't skipped/failed yet
     final idx = untestedDeclarations.indexWhere(
       (pair) => !skippedOrFailedDeclarations.contains(pair.$1.id),
     );
 
+    // If all remaining declarations have been skipped/failed, break the loop
     if (idx == -1) {
+      print(
+        '[FLOW] No more declarations can be processed. Terminating test generation loop.',
+      );
       break;
     }
 
-    _logger.info(
-      'Remaining untested declarations: '
-      '${untestedDeclarations.length - skippedOrFailedDeclarations.length}',
-    );
+    final remainingCount =
+        untestedDeclarations.length - skippedOrFailedDeclarations.length;
+    print('\n[FLOW] ====================================================');
+    print('[FLOW] Untested declarations remaining: $remainingCount');
 
+    // Retrieve the declaration and the list of uncovered lines
     final (declaration, lines) = untestedDeclarations[idx];
+    print(
+      '[FLOW] Selected Target: "${declaration.name}" (ID: ${declaration.id}) in ${path.relative(declaration.path, from: flags.package)}',
+    );
+    print('[FLOW] Uncovered lines for this declaration: $lines');
 
+    // Format the code block for the selected declaration
     final toBeTestedCode = formatUntestedCode(declaration, lines);
 
+    // Step 7a: Collect references & dependencies of this declaration (BFS/DFS traversal of AST)
+    // This gives the LLM context about other classes/methods used by this code, enabling it
+    // to write valid tests without mock errors.
+    print(
+      '[FLOW] Analyzing dependency context for "${declaration.name}" up to depth of ${flags.maxDepth}...',
+    );
     final contextMap = buildDependencyContext(
       declaration,
       maxDepth: flags.maxDepth,
     );
 
+    // Format context mapping for injection into the LLM prompt
     final contextCode = formatContext(contextMap);
+    print('[FLOW] Dependency context generated successfully.');
 
+    // Step 7b: Query the LLM to generate tests
+    print('[FLOW] Sending request to Gemini LLM to generate tests...');
     final result = await testGenerator.generate(
       toBeTestedCode: toBeTestedCode,
       contextCode: contextCode,
@@ -324,9 +428,15 @@ Future<void> main(List<String> arguments) async {
           '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
     );
 
+    print('[FLOW] LLM response received. Status: ${result.status}');
     bool isTestDeleted = result.status != TestStatus.created;
 
+    // Step 7c: If --effective-tests-only is enabled, we run the suite and verify
+    // if code coverage actually improved. If it didn't, we discard the generated test file.
     if (flags.effectiveTestsOnly && result.status == TestStatus.created) {
+      print(
+        '[FLOW] Validation: Checking if the generated test increases code coverage...',
+      );
       final isImproved = await validateTestCoverageImprovement(
         declaration: declaration,
         baselineUncoveredLines: lines.length,
@@ -338,15 +448,20 @@ Future<void> main(List<String> arguments) async {
       );
 
       if (!isImproved) {
-        _logger.info(
-          'Generated tests for ${declaration.name} did not improve '
-          'coverage. Discarding...\n',
+        print(
+          '[FLOW] Validation Outcome: Test did not improve coverage. Deleting generated test file.',
         );
         await result.testFile.deleteTest();
         isTestDeleted = true;
+      } else {
+        print(
+          '[FLOW] Validation Outcome: Success! Code coverage increased. Keeping test file: ${result.testFile.testFilePath}',
+        );
       }
     }
 
+    // Step 7d: Re-run tests to collect updated coverage map
+    print('[FLOW] Re-running tests to collect new coverage metrics...');
     final newCoverage = await runTestsAndCollectCoverage(
       flags.package,
       vmServicePort: flags.vmServicePort,
@@ -358,16 +473,27 @@ Future<void> main(List<String> arguments) async {
 
     final newCoverageByFile = await formatCoverage(newCoverage, flags.package);
 
+    // If the test was successfully kept, update our listing of untested declarations
     if (result.status == TestStatus.created && !isTestDeleted) {
+      print(
+        '[FLOW] Updating list of untested declarations with new coverage data.',
+      );
       untestedDeclarations = extractUntestedDeclarations(
         declarationsByFile,
         newCoverageByFile,
       );
     } else {
+      // Otherwise mark this declaration as skipped/failed to avoid trying it again
+      print(
+        '[FLOW] Marking declaration "${declaration.name}" as skipped/failed to avoid re-tries.',
+      );
       skippedOrFailedDeclarations.add(declaration.id);
     }
   }
 
+  // Clean up test generator resources
+  print('[FLOW] Step 8: Disposing test generator and cleaning up...');
   await testGenerator.dispose();
+  print('[FLOW] Process finished successfully.');
   exit(0);
 }
