@@ -90,29 +90,37 @@ void _watchExitSignal(ProcessSignal signal) {
   // Listen for the OS notification event
   signal.watch().listen(_killSubprocessesAndExit);
 }
+//-------------- STARTING DYNAMIC LAYER  ---------------
 
+//rendering engine
 Future<Map<String, dynamic>> _collectCoverageViaLcov(String packageDir) async {
   _logger.info('Running flutter test --coverage in $packageDir');
-  final ProcessResult result = await Process.run(
-    'flutter',
-    ['test', '--coverage'],
-    workingDirectory: packageDir,
-  );
+  final ProcessResult result = await Process.run('flutter', [
+    'test',
+    '--coverage',
+  ], workingDirectory: packageDir);
 
   // We should accept exit codes 0 and 79 (no tests found)
   if (result.exitCode != 0 && result.exitCode != 79) {
-    throw ProcessException('flutter', ['test', '--coverage'], result.stderr.toString(), result.exitCode);
+    throw ProcessException(
+      'flutter',
+      ['test', '--coverage'],
+      result.stderr.toString(),
+      result.exitCode,
+    );
   }
 
   final lcovFile = File(path.join(packageDir, 'coverage', 'lcov.info'));
   if (!lcovFile.existsSync()) {
-    _logger.warning('lcov.info not found at ${lcovFile.path}. Returning empty coverage.');
+    _logger.warning(
+      'lcov.info not found at ${lcovFile.path}. Returning empty coverage.',
+    );
     return {'type': 'CodeCoverage', 'coverage': []};
   }
 
   final lines = await lcovFile.readAsLines();
   final List<Map<String, dynamic>> coverageList = [];
-  
+
   final PackageConfig? config = await findPackageConfig(Directory(packageDir));
 
   String? currentSource;
@@ -136,23 +144,17 @@ Future<Map<String, dynamic>> _collectCoverageViaLcov(String packageDir) async {
       }
     } else if (line == 'end_of_record') {
       if (currentSource != null) {
-        coverageList.add({
-          'source': currentSource,
-          'hits': currentHits,
-        });
+        coverageList.add({'source': currentSource, 'hits': currentHits});
       }
       currentSource = null;
       currentHits = [];
     }
   }
 
-  return {
-    'type': 'CodeCoverage',
-    'coverage': coverageList,
-  };
+  return {'type': 'CodeCoverage', 'coverage': coverageList};
 }
 
-//-------------- STARTING DYNAMIC LAYER  ---------------
+//pure runtime
 Future<Map<String, dynamic>> runTestsAndCollectCoverage(
   String packageDir, {
   String vmServicePort = '0', //set to 0 to let the system pick a random port
@@ -179,7 +181,9 @@ Future<Map<String, dynamic>> runTestsAndCollectCoverage(
   }
 
   final File pubspecFile = File(path.join(packageDir, 'pubspec.yaml'));
-  final bool isFlutter = pubspecFile.existsSync() && pubspecFile.readAsStringSync().contains('sdk: flutter');
+  final bool isFlutter =
+      pubspecFile.existsSync() &&
+      pubspecFile.readAsStringSync().contains('sdk: flutter');
 
   if (isFlutter) {
     return _collectCoverageViaLcov(packageDir);
