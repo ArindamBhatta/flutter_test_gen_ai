@@ -3,7 +3,7 @@
 import 'package:analyzer/dart/ast/ast.dart' as ast;
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
+import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
 
 class DependencyVisitor extends RecursiveAstVisitor<void> {
   final ast.Declaration astNode;

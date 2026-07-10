@@ -1,5 +1,5 @@
 import 'dart:collection';
-import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
+import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
 
 import 'package:collection/collection.dart';
 

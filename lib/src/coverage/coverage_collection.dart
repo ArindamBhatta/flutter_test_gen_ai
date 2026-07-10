@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:coverage/coverage.dart';
-import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
+import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
 
 import 'package:logging/logging.dart';
 import 'package:package_config/package_config.dart';

@@ -1,5 +1,5 @@
 import 'package:analyzer/source/line_info.dart';
-import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
+import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
 
 import 'package:logging/logging.dart';
 import 'package:analyzer/dart/ast/ast.dart' as ast;

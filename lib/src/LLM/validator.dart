@@ -1,5 +1,5 @@
 import 'package:logging/logging.dart';
-import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
+import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
 
 /// List of standard validators that are run on generated test files.
 /// These validators must be passed before a test file is considered valid.
