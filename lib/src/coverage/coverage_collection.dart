@@ -255,9 +255,13 @@ Future<CoverageData> formatCoverage(
       .where((fileHits) => fileHits.$2.isNotEmpty)
       .toList();
 
-  _logger.info(
-    'Dynamic Layer uncovered source file ${result[0].$1} and Line numbers : ${result[0].$2}',
-  );
+  if (result.isNotEmpty) {
+    _logger.info(
+      'Dynamic Layer uncovered source file ${result[0].$1} and Line numbers : ${result[0].$2}',
+    );
+  } else {
+    _logger.info('Dynamic Layer: No uncovered source files found.');
+  }
   return result;
 }
 

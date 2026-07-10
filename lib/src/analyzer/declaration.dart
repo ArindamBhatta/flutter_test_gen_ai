@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /* 
 1. Represent a code declaration extracted from Dart source file during static analysis.
 
@@ -61,75 +63,7 @@ class Declaration {
 
   String toCode() => sourceCode.join('\n');
 
-  ///Returns a GraphViz DOT format representation of this declaration
-  String toGraphViz() {
-    final StringBuffer buffer = StringBuffer();
 
-    //create node for this declaration [decl_42]
-    final String nodeId = "decl_$id";
-
-    final String escapedName = name.replaceAll('"', '\\"');
-
-    String shape = 'box';
-    String color = 'lightblue';
-
-    //decl_42 [label="calculateSum\n(15:17)", shape=box, fillcolor=lightblue, style=filled];
-    //1. $nodeId: This is the unique ID for the node (e.g., decl_42). Graphviz needs this identifier so it knows which box is and when connecting arrows later.
-    //2. label="...": This is the actual text that will be written inside the box.
-    //3. \\n: This renders as a literal \n in the text file. Graphviz reads \n as a line break, causing the line numbers to appear below the method name inside the box.
-    //4. shape=$shape: Tells Graphviz what shape to draw. Since shape is set to 'box', it draws a rectangle instead of the default oval.
-
-    buffer.writeln(
-      '$nodeId [label = "$escapedName\\n($startLine:$endLine)",  shape=$shape '
-      'fillcolor=$color, style=filled];',
-    );
-
-    for (final dependency in dependsOn) {
-      final depNodeId = 'decl_${dependency.id}';
-      buffer.writeln(' $nodeId -> $depNodeId');
-    }
-
-    return buffer.toString();
-  }
-
-  /* 
-   Create a complete GraphViz DOT graph from a list of declarations.
-
-   This static method generate a full DOT graph that can be rendered with GraphViz tools. It includes all declarations and their dependencies.
-
-   Parameters:
-   ? - [declarations]: List of declarations to includes in the graph.
-   ? - [title]: Optional title for the graph.
-   ? - [rankdir]: Direction of the graph layout.
-   */
-
-  // Return a complete Dot format string ready for GraphViz rendering
-
-  static String toGraphVizFromDeclarations(
-    List<Declaration> declarations, {
-    String title = 'Declaration Dependencies',
-    String rankdir = "LR", //Left-to-Right)
-  }) {
-    final buffer = StringBuffer();
-
-    buffer.writeln('diagram G {');
-    buffer.writeln(' rankdir=$rankdir');
-    buffer.writeln(' node [fontname="Arial", fontsize=10];');
-    buffer.writeln(' edge [fontname="Arial", fontsize=8];');
-    buffer.writeln(' label="$title";');
-    buffer.writeln(' labelloc=t;');
-    buffer.writeln(' fontsize=16;');
-    buffer.writeln();
-
-    // add all declarations and their dependencies
-
-    for (final Declaration declaration in declarations) {
-      buffer.write(declaration.toGraphViz());
-    }
-
-    buffer.writeln('}');
-    return buffer.toString();
-  }
 
   @override
   String toString() {
@@ -146,5 +80,130 @@ class Declaration {
 
           )
         ''';
+  }
+}
+
+class MermaidReporter {
+  /// Generates a Markdown report containing a Mermaid flowchart of the project's declarations.
+  /// Tracks coverage progress by comparing initial and final untested lists.
+  static String generateReport({
+    required List<Declaration> allDeclarations,
+    required List<(Declaration, List<int>)> initialUntested,
+    required List<(Declaration, List<int>)> finalUntested,
+  }) {
+    final buffer = StringBuffer();
+
+    // Group initial and final uncovered line counts by declaration ID
+    final initialUncoveredLines = {
+      for (final (decl, lines) in initialUntested) decl.id: lines
+    };
+    final finalUncoveredLines = {
+      for (final (decl, lines) in finalUntested) decl.id: lines
+    };
+
+    buffer.writeln('# TestGen Coverage & Dependency Report');
+    buffer.writeln('Generated on: ${DateTime.now().toUtc().toIso8601String().replaceAll("T", " ").substring(0, 19)} UTC\n');
+
+    buffer.writeln('## Summary of Test Generation');
+    
+    // Count stats
+    int alreadyTestedCount = 0;
+    int newlyTestedCount = 0;
+    int remainingUntestedCount = 0;
+
+    for (final decl in allDeclarations) {
+      final wasUntested = initialUncoveredLines.containsKey(decl.id);
+      final isUntested = finalUncoveredLines.containsKey(decl.id);
+
+      if (!wasUntested) {
+        alreadyTestedCount++;
+      } else if (!isUntested) {
+        newlyTestedCount++;
+      } else {
+        remainingUntestedCount++;
+      }
+    }
+
+    buffer.writeln('- **Total Declarations:** ${allDeclarations.length}');
+    buffer.writeln('- **Already Fully Tested:** $alreadyTestedCount ✅');
+    buffer.writeln('- **Newly Tested (This Run):** $newlyTestedCount 🎉');
+    buffer.writeln('- **Remaining Untested/Partial:** $remainingUntestedCount ⚠️\n');
+
+    buffer.writeln('---');
+    buffer.writeln('## Declaration Relationship & Coverage Map\n');
+    buffer.writeln('```mermaid');
+    buffer.writeln('graph TD');
+    buffer.writeln('  %% Styling');
+    buffer.writeln('  classDef alreadyTested fill:#e2f0d9,stroke:#385723,stroke-width:2px;');
+    buffer.writeln('  classDef newlyTested fill:#d9e1f2,stroke:#305496,stroke-width:2px,stroke-dasharray: 5 5;');
+    buffer.writeln('  classDef untested fill:#fce4d6,stroke:#c65911,stroke-width:2px;\n');
+
+    // 2. Separate top-level/class declarations from nested/method/function declarations
+    final topLevel = allDeclarations.where((d) => d.parent == null).toList();
+    final nested = allDeclarations.where((d) => d.parent != null).toList();
+
+    // Group nested declarations by parent ID
+    final childrenMap = <int, List<Declaration>>{};
+    for (final child in nested) {
+      childrenMap.putIfAbsent(child.parent!.id, () => []).add(child);
+    }
+
+    // Helper to get status string and style name
+    (String, String) getDeclarationStatus(Declaration decl) {
+      final wasUntested = initialUncoveredLines.containsKey(decl.id);
+      final isUntested = finalUncoveredLines.containsKey(decl.id);
+
+      if (!wasUntested) {
+        return ('✅ (Already Tested)', 'alreadyTested');
+      } else if (!isUntested) {
+        return ('🎉 ✅ (Newly Tested)', 'newlyTested');
+      } else {
+        final linesCount = finalUncoveredLines[decl.id]?.length ?? 0;
+        return ('⚠️ (Needs Coverage: $linesCount lines)', 'untested');
+      }
+    }
+
+    // 3. Generate subgraphs for top-level classes/files and their children
+    for (final parent in topLevel) {
+      final (parentLabel, parentStyle) = getDeclarationStatus(parent);
+      
+      buffer.writeln('  subgraph Parent_${parent.id} ["${parent.name} - $parentLabel"]');
+      
+      final children = childrenMap[parent.id] ?? [];
+      if (children.isEmpty) {
+        // Parent declaration has no nested children, define it as a standalone node in the subgraph
+        buffer.writeln('    node_${parent.id}["${parent.name}"]:::$parentStyle');
+      } else {
+        for (final child in children) {
+          final (childLabel, childStyle) = getDeclarationStatus(child);
+          buffer.writeln('    node_${child.id}["${child.name}() - $childLabel"]:::$childStyle');
+        }
+      }
+      buffer.writeln('  end\n');
+    }
+
+    // 4. Draw dependency relationships
+    buffer.writeln('  %% Dependency Lines');
+    for (final decl in allDeclarations) {
+      for (final dep in decl.dependsOn) {
+        final sourceNode = 'node_${decl.id}';
+        final targetNode = 'node_${dep.id}';
+        buffer.writeln('  $sourceNode --> $targetNode');
+      }
+    }
+
+    buffer.writeln('```\n');
+    buffer.writeln('### Legend');
+    buffer.writeln('- **Green Box (Solid border)**: Already fully covered/tested.');
+    buffer.writeln('- **Blue Box (Dashed border)**: Newly generated tests successfully covered this declaration in this run.');
+    buffer.writeln('- **Orange Box (Solid border)**: Needs coverage. The line count indicates remaining uncovered lines.');
+
+    return buffer.toString();
+  }
+
+  /// Writes the generated markdown report to the workspace directory.
+  static Future<void> writeReport(String packagePath, String content) async {
+    final reportFile = File('$packagePath/testgen_report.md');
+    await reportFile.writeAsString(content);
   }
 }

@@ -89,6 +89,13 @@ ArgParser _createArgParser() => ArgParser()
     defaultsTo: false,
     help: 'Enable verbose logging. Logs LLM prompts to a file.',
   )
+  ..addFlag(
+    'generate-report',
+    defaultsTo: false,
+    aliases: const ['mermaid-report'],
+    help:
+        'Generate a Markdown report with a Mermaid dependency and coverage diagram.',
+  )
   ..addFlag('help', abbr: 'h', negatable: false, help: 'Show this help.');
 
 /// A container class that holds all configuration values parsed from
@@ -106,6 +113,7 @@ class Flags {
   final int maxDepth;
   final int maxAttempts;
   final bool verbose;
+  final bool generateReport;
 
   const Flags({
     required this.package,
@@ -120,6 +128,7 @@ class Flags {
     required this.maxDepth,
     required this.maxAttempts,
     required this.verbose,
+    required this.generateReport,
   });
 }
 
@@ -258,6 +267,7 @@ ${parser.usage}
     maxDepth: int.parse(results['max-depth'] as String),
     maxAttempts: int.parse(results['max-attempts'] as String),
     verbose: results['verbose'] as bool,
+    generateReport: results['generate-report'] as bool,
   );
 }
 
@@ -377,6 +387,11 @@ Future<void> main(List<String> arguments) async {
   // Step 5: Create a Record of all the Identify untested or partially tested declarations by cross-referencing with the baseline coverage report in dynamic layer.
   List<(Declaration, List<int>)> untestedDeclarations =
       extractUntestedDeclarations(declarationsByFile, coverageByFile);
+
+  //Todo: check this
+  final List<(Declaration, List<int>)> initialUntestedDeclarations = List.from(
+    untestedDeclarations,
+  );
 
   _logger.info(
     ' 📚 📚 📚 Found ${untestedDeclarations.length} untested/partially tested declarations.',
@@ -523,6 +538,20 @@ Future<void> main(List<String> arguments) async {
   // Clean up test generator resources
   _logger.info('Step 8: Disposing test generator and cleaning up...');
   await testGenerator.dispose();
+
+  if (flags.generateReport) {
+    _logger.info('Generating coverage and dependency report...');
+    final report = MermaidReporter.generateReport(
+      allDeclarations: declarations,
+      initialUntested: initialUntestedDeclarations,
+      finalUntested: untestedDeclarations,
+    );
+    await MermaidReporter.writeReport(flags.package, report);
+    _logger.info(
+      'Report generated successfully at: ${flags.package}/testgen_report.md',
+    );
+  }
+
   _logger.info('Process finished successfully.');
   exit(0);
 }
