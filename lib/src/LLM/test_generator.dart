@@ -131,6 +131,7 @@ class TestGenerator {
 
     String prompt = promptGenerator.testCode(toBeTestedCode, contextCode, hint: hint);
 
+    bool isFileWritten = false;
     int attempt = 1;
     for (; attempt <= maxRetries && status == TestStatus.failed; attempt++) {
       _logger.info(
@@ -147,6 +148,7 @@ class TestGenerator {
 
         if (response.needTesting) {
           await testFile.writeTest(response.code);
+          isFileWritten = true;
 
           final validation = await _runValidators(testFile, promptGenerator);
 
@@ -169,7 +171,9 @@ class TestGenerator {
         // the quota exceeded for (RPM) or (TPM) by waiting at least a minute.
         if (isRateLimitError && backoff.inSeconds >= 128) {
           status = TestStatus.failed;
-          await testFile.deleteTest();
+          if (isFileWritten) {
+            await testFile.deleteTest();
+          }
           throw StateError(
             'You exceeded your daily quota, try again later or change model',
           );
@@ -190,7 +194,7 @@ class TestGenerator {
       }
     }
 
-    if (status == TestStatus.failed || status == TestStatus.skipped) {
+    if ((status == TestStatus.failed || status == TestStatus.skipped) && isFileWritten) {
       await testFile.deleteTest();
     }
 

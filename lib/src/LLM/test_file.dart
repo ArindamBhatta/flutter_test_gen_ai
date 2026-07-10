@@ -84,10 +84,17 @@ class TestFile {
   // Runs the generated test file using the Dart test runner.
   Future<String?> runTest() async {
     _logger.info('Running tests in $testFilePath');
-    final result = await Process.run('dart', [
-      'test',
-      testFilePath,
-    ], workingDirectory: packagePath);
+    final File pubspecFile = File(path.join(packagePath, 'pubspec.yaml'));
+    final bool isFlutter = pubspecFile.existsSync() && pubspecFile.readAsStringSync().contains('sdk: flutter');
+
+    final result = await Process.run(
+      isFlutter ? 'flutter' : 'dart',
+      [
+        'test',
+        testFilePath,
+      ],
+      workingDirectory: packagePath,
+    );
 
     testErrors += result.exitCode != 0 ? 1 : 0;
 
@@ -98,10 +105,15 @@ class TestFile {
   //clean up spacing and indentation
   Future<String?> runFormat() async {
     _logger.info('Formatting test file at $testFilePath');
-    final result = await Process.run('dart', [
-      'format',
-      testFilePath,
-    ], workingDirectory: packagePath);
+
+    final result = await Process.run(
+      'dart',
+      [
+        'format',
+        testFilePath,
+      ],
+      workingDirectory: packagePath,
+    );
 
     return result.exitCode != 0 ? result.stdout.toString() : null;
   }

@@ -27,13 +27,14 @@ final _allProcesses = <Process>[];
 bool _isSignalsWatched = false;
 
 Future<void> _dartRun(
+  String executable,
   List<String> args, {
   required String packageAbsolutePath,
   required void Function(String) onStdout,
   required void Function(String) onStderr,
 }) async {
   final Process process = await Process.start(
-    Platform.executable,
+    executable,
     args,
     workingDirectory: packageAbsolutePath,
   );
@@ -71,7 +72,7 @@ Future<void> _dartRun(
 
   // Don't throw an error if the process exits with code 79 which is common for no tests found.
   if (result != 0 && result != 79) {
-    throw ProcessException(Platform.executable, args, '', result);
+    throw ProcessException(executable, args, '', result);
   }
 }
 
@@ -88,6 +89,67 @@ void _killSubprocessesAndExit(ProcessSignal signal) {
 void _watchExitSignal(ProcessSignal signal) {
   // Listen for the OS notification event
   signal.watch().listen(_killSubprocessesAndExit);
+}
+
+Future<Map<String, dynamic>> _collectCoverageViaLcov(String packageDir) async {
+  _logger.info('Running flutter test --coverage in $packageDir');
+  final ProcessResult result = await Process.run(
+    'flutter',
+    ['test', '--coverage'],
+    workingDirectory: packageDir,
+  );
+
+  // We should accept exit codes 0 and 79 (no tests found)
+  if (result.exitCode != 0 && result.exitCode != 79) {
+    throw ProcessException('flutter', ['test', '--coverage'], result.stderr.toString(), result.exitCode);
+  }
+
+  final lcovFile = File(path.join(packageDir, 'coverage', 'lcov.info'));
+  if (!lcovFile.existsSync()) {
+    _logger.warning('lcov.info not found at ${lcovFile.path}. Returning empty coverage.');
+    return {'type': 'CodeCoverage', 'coverage': []};
+  }
+
+  final lines = await lcovFile.readAsLines();
+  final List<Map<String, dynamic>> coverageList = [];
+  
+  final PackageConfig? config = await findPackageConfig(Directory(packageDir));
+
+  String? currentSource;
+  List<int> currentHits = [];
+
+  for (final line in lines) {
+    if (line.startsWith('SF:')) {
+      final relativePath = line.substring(3).trim();
+      final fileUri = Uri.file(path.join(packageDir, relativePath));
+      currentSource = config?.toPackageUri(fileUri)?.toString() ?? relativePath;
+      currentHits = [];
+    } else if (line.startsWith('DA:')) {
+      final parts = line.substring(3).split(',');
+      if (parts.length == 2) {
+        final lineNum = int.tryParse(parts[0]);
+        final hits = int.tryParse(parts[1]);
+        if (lineNum != null && hits != null) {
+          currentHits.add(lineNum);
+          currentHits.add(hits);
+        }
+      }
+    } else if (line == 'end_of_record') {
+      if (currentSource != null) {
+        coverageList.add({
+          'source': currentSource,
+          'hits': currentHits,
+        });
+      }
+      currentSource = null;
+      currentHits = [];
+    }
+  }
+
+  return {
+    'type': 'CodeCoverage',
+    'coverage': coverageList,
+  };
 }
 
 //-------------- STARTING DYNAMIC LAYER  ---------------
@@ -116,18 +178,36 @@ Future<Map<String, dynamic>> runTestsAndCollectCoverage(
     await _generateCoverageImportFile(packageDir);
   }
 
+  final File pubspecFile = File(path.join(packageDir, 'pubspec.yaml'));
+  final bool isFlutter = pubspecFile.existsSync() && pubspecFile.readAsStringSync().contains('sdk: flutter');
+
+  if (isFlutter) {
+    return _collectCoverageViaLcov(packageDir);
+  }
+
   final serviceUriCompleter = Completer<Uri>();
+
+  final String executable = isFlutter ? 'flutter' : Platform.executable;
+  final List<String> args = isFlutter
+      ? [
+          'test',
+          '--pause-isolates-on-exit',
+          '--disable-service-auth-codes',
+          '--enable-vm-service=$vmServicePort',
+        ]
+      : [
+          if (branchCoverage) '--branch-coverage',
+          'run',
+          '--pause-isolates-on-exit',
+          '--disable-service-auth-codes',
+          '--enable-vm-service=$vmServicePort',
+          'test',
+        ];
 
   //2. Call or Launching Dart with VM Service Flags
   final testProcess = _dartRun(
-    [
-      if (branchCoverage) '--branch-coverage',
-      'run',
-      '--pause-isolates-on-exit', //? --pause-isolates-on-exit: This prevents Dart from closing immediately when the tests finish. It freezes the program at the finish line so the coverage collector has time to extract the data.
-      '--disable-service-auth-codes',
-      '--enable-vm-service=$vmServicePort', //? --enable-vm-service: This fires up an internal HTTP server inside the Dart runtime.
-      'test',
-    ],
+    executable,
+    args,
     packageAbsolutePath: packageDir,
     //listen every output to find the vm service port
     onStdout: (line) {
