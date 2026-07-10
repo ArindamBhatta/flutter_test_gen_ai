@@ -1,15 +1,13 @@
 import 'dart:io';
+import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
 
+import 'package:path/path.dart' as path;
 import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/analysis/session.dart';
-import 'package:flutter_test_gen_ai/src/coverage/coverage_collection.dart';
 import 'package:logging/logging.dart';
 import 'package:package_config/package_config.dart';
-import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
-import 'package:path/path.dart' as path;
-import 'package:flutter_test_gen_ai/src/analyzer/parser.dart';
 
 final _logger = Logger('analyzer');
 

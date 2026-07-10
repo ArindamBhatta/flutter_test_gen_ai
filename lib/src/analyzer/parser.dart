@@ -1,9 +1,8 @@
 import 'package:analyzer/source/line_info.dart';
+import 'package:flutter_test_gen_ai/flutter_testgen_ai.dart';
 
 import 'package:logging/logging.dart';
 import 'package:analyzer/dart/ast/ast.dart' as ast;
-import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
-import 'package:flutter_test_gen_ai/src/analyzer/visitor.dart';
 
 final _logger = Logger('parser');
 
