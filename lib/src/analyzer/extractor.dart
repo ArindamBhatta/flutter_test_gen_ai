@@ -103,21 +103,31 @@ Future<List<Declaration>> extractDeclarations(
 }
 
 /*
+untestedDeclaration
+
 
 */
 
 List<(Declaration, List<int>)> extractUntestedDeclarations(
   Map<String, List<Declaration>> declarations,
+  /*
+     coverageResults List<(String, List<int>)>
+     [
+        ('lib/example/example.dart', [3, 4, 5, 6, 7, 8]),
+        ('lib/example/example2.dart', [1, 2, 3, 4, 5, 6]),
+     ]
+  */
   CoverageData coverageResults,
 ) {
-  _logger.info('Extracting untested declarations based on coverage data');
   final untestedDeclarations = <(Declaration, List<int>)>[];
 
   for (final (filePath, uncoveredLines) in coverageResults) {
-    final fileDeclarations = declarations[filePath] ?? [];
-    for (final declaration in fileDeclarations) {
-      final lines = <int>[];
-      for (final line in uncoveredLines) {
+    final List<Declaration> fileDeclarations = declarations[filePath] ?? [];
+
+    for (final Declaration declaration in fileDeclarations) {
+      final List<int> lines = <int>[];
+
+      for (final int line in uncoveredLines) {
         if (line >= declaration.startLine && line <= declaration.endLine) {
           lines.add(line - declaration.startLine);
         }

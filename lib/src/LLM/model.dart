@@ -5,6 +5,19 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:logging/logging.dart';
 
 class GeminiModel {
+  // `GenerativeModel` is the official client class from the `google_generative_ai` package.
+  // that directly interfaces with Google's Gemini API.
+
+  // We use `GenerativeModel` to configure model parameters (like API key, model name, temperature,
+  // response schemas, and system instructions) and to handle operations like starting chats and counting tokens.
+
+  // `GeminiModel` (this class) acts as a custom wrapper around `GenerativeModel` to simplify
+  // this configuration specifically for test generation, enforce the structured JSON output schema,
+  // and provide a clean API (`GeminiChat`, `ChatResponse`) to the rest of our application.
+  late final GenerativeModel _model;
+
+  final _logger = Logger('GeminiModel');
+
   GeminiModel({
     String modelName = 'gemini-3-flash-preview',
     String? apiKey,
@@ -31,8 +44,6 @@ class GeminiModel {
       topP: topP,
     );
   }
-  late final GenerativeModel _model;
-  final _logger = Logger('GeminiModel');
 
   String _envApiKey() {
     final apiKey = Platform.environment['GEMINI_API_KEY'];
@@ -50,13 +61,15 @@ class GeminiModel {
     required double temperature,
     required double topP,
   }) {
-    final schema = Schema.object(
+    final Schema schema = Schema.object(
       description: 'Schema for generated Dart test cases.',
+      // properties
       properties: {
         'code': Schema.string(
           description: 'Generated Dart test code.',
           nullable: false,
         ),
+
         'needTesting': Schema.boolean(
           description:
               'True only if the code snippet can be usefully tested. '

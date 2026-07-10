@@ -39,6 +39,7 @@ class GenerationResponse {
   }
 }
 
+//Call from the main Dart file
 class TestGenerator {
   final GeminiModel model; // [GeminiModel class]
   final String packagePath; // path to the package
@@ -120,10 +121,13 @@ class TestGenerator {
     required String contextCode,
     required String fileName,
   }) async {
-    final chat = model.startChat();
+    final GeminiChat chat = model.startChat();
     TestStatus status = TestStatus.failed;
+
     Duration backoff = initialBackoff;
-    final testFile = TestFile(packagePath, fileName);
+
+    final TestFile testFile = TestFile(packagePath, fileName);
+
     String prompt = promptGenerator.testCode(toBeTestedCode, contextCode);
 
     int attempt = 1;

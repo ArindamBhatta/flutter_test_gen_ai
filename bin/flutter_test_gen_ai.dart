@@ -361,24 +361,35 @@ Future<void> main(List<String> arguments) async {
   // Group the declarations by the file they belong to
   final Map<String, List<Declaration>> declarationsByFile = {};
 
+  //Loop through each declaration and add it to the map
   for (final declaration in declarations) {
-    declarationsByFile.putIfAbsent(declaration.path, () => []).add(declaration);
-  }
+    final String path = declaration.path;
 
-  // Step 5: Identify untested or partially tested declarations by cross-referencing
-  // with the baseline coverage report in dynamic layer.
+    // If the key doesn't exist, initialize it with an empty list
+    if (!declarationsByFile.containsKey(path)) {
+      declarationsByFile[path] = [];
+    }
+    // Add the declaration to the list associated with its path
+    declarationsByFile[path]!.add(declaration);
+  }
+  // _logger.info("Declarations by file static layer 📚 📚 📚  : $declarationsByFile");
+
+  // Step 5: Create a Record of all the Identify untested or partially tested declarations by cross-referencing with the baseline coverage report in dynamic layer.
   List<(Declaration, List<int>)> untestedDeclarations =
       extractUntestedDeclarations(declarationsByFile, coverageByFile);
 
   _logger.info(
-    'Found ${untestedDeclarations.length} untested/partially tested declarations.',
+    ' 📚 📚 📚 Found ${untestedDeclarations.length} untested/partially tested declarations.',
   );
 
   // Step 6: Initialize Gemini model and test generation framework
-  final model = GeminiModel(modelName: flags.model, apiKey: flags.apiKey);
-
+  final GeminiModel model = GeminiModel(
+    modelName: flags.model,
+    apiKey: flags.apiKey,
+  );
+  //call to generate tests
   final TestGenerator testGenerator = TestGenerator(
-    model: model,
+    model: model, //GeminiModel
     packagePath: flags.package,
     maxRetries: flags.maxAttempts,
     verbose: flags.verbose,
@@ -390,7 +401,7 @@ Future<void> main(List<String> arguments) async {
   // Shuffle untested declarations to randomize the order in which we build tests
   untestedDeclarations.shuffle();
 
-  _logger.info('Step 7: Starting test generation loop...');
+  //Step 7: Iterate through each untested declaration, generate tests, and validate them
   while (untestedDeclarations.isNotEmpty) {
     // Find the next declaration that we haven't skipped/failed yet
     final idx = untestedDeclarations.indexWhere(
@@ -407,7 +418,7 @@ Future<void> main(List<String> arguments) async {
 
     final remainingCount =
         untestedDeclarations.length - skippedOrFailedDeclarations.length;
-    _logger.info('====================================================');
+
     _logger.info('Untested declarations remaining: $remainingCount');
 
     // Retrieve the declaration and the list of uncovered lines
@@ -437,6 +448,8 @@ Future<void> main(List<String> arguments) async {
 
     // Step 7b: Query the LLM to generate tests
     _logger.info('Sending request to Gemini LLM to generate tests...');
+
+    //call Generate method
     final result = await testGenerator.generate(
       toBeTestedCode: toBeTestedCode,
       contextCode: contextCode,

@@ -13,6 +13,7 @@ import 'package:path/path.dart' as path;
 final _logger = Logger('coverage');
 //Records : (filepath, ListOfUncoveredLines)
 
+//Create a record to store the coverage data
 typedef CoverageData = List<(String, List<int>)>;
 
 //cross-platform path styling os .
@@ -209,25 +210,28 @@ void main(){}
 ''');
 }
 
-//Step 2:  🧹 🧹 🧹 CLEANING UP AND FORMATTING RAW JSON COVERAGE DATA 🧹 🧹 🧹
+//Step 2: Converts the raw coverage report into CoverageData by
+// extracting only the uncovered line numbers for each source file.
 Future<CoverageData> formatCoverage(
   Map<String, dynamic> coverageResults,
   String packageDir,
 ) async {
   _logger.fine('Formatting raw coverage results into CoverageData structure');
   final List<Map<String, dynamic>> coverage = coverageResults['coverage'];
-  //A HitMap (short for "Hit Map") is a highly specialized data model created by the official Dart package:coverage library.
-  //1. The Problem: Raw JSON is Messy
-  // When your tool dials into the Dart VM backdoor and downloads the raw coverage metadata payload, the server sends back a massive, heavily nested JSON map that looks like this:
+  /*
+      A HitMap (short for "Hit Map") is a highly specialized data model created by the official Dart package:coverage library.
+      1. The Problem: Raw JSON is Messy
+      When your tool dials into the Dart VM backdoor and downloads the raw coverage metadata payload, the server sends back a massive, heavily nested JSON map that looks like this:
 
-  // {
-  // "source": "package:my_app/user.dart",
-  // "hits": [12, 1, 14, 0, 15, 3]
-  // } : Line 12 was hit 1 time, Line 14 was hit 0 times, and Line 15 was hit 3 times.
+      {
+      "source": "package:my_app/user.dart",
+      "hits": [12, 1, 14, 0, 15, 3]
+      } : Line 12 was hit 1 time, Line 14 was hit 0 times, and Line 15 was hit 3 times.
 
-  // A HitMap contains a primary internal property called lineHits, which is a clean, structured Map<int, int>:
-  // The Key (int): The literal line number in your source file.
-  // The Value (int): The total number of times a test case executed that line.
+      A HitMap contains a primary internal property called lineHits, which is a clean, structured Map<int, int>:
+      The Key (int): The literal line number in your source file.
+      The Value (int): The total number of times a test case executed that line.
+   */
 
   final Map<String, HitMap> hitmaps = await HitMap.parseJson(
     coverage,
@@ -237,22 +241,23 @@ Future<CoverageData> formatCoverage(
   final CoverageData result = hitmaps.entries
       .map(
         (fileHits) => (
-          fileHits
-              .key, // The String file path (e.g., 'package:my_app/user.dart')
+          // The String file path (e.g., 'package:my_app/user.dart')
+          fileHits.key,
+
           fileHits.value.lineHits.entries
-              .where(
-                (lineHit) => lineHit.value == 0,
-              ) // Step 1: Keep ONLY the pairs where run count is 0
-              .map(
-                (lineHit) => lineHit.key,
-              ) // Step 2: Extract just the line number (the key)
+              // Step 1: Keep ONLY the pairs where run count is 0
+              .where((lineHit) => lineHit.value == 0)
+              // Step 2: Extract just the line number (the key)
+              .map((MapEntry<int, int> lineHit) => lineHit.key)
               .toList(), // Step 3: Turn them into a List
         ),
       )
       .where((fileHits) => fileHits.$2.isNotEmpty)
       .toList();
 
-  _logger.info('Dynamic Layer 🎯🎯🎯🎯🎯🎯🎯 : Coverage Data: $result');
+  _logger.info(
+    'Dynamic Layer uncovered source file ${result[0].$1} and Line numbers : ${result[0].$2}',
+  );
   return result;
 }
 
