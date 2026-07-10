@@ -67,6 +67,9 @@ Declaration _parseDeclaration(
   int? groupOffset,
   int? groupEnd,
   Declaration? parent,
+  String? superclass,
+  List<String> mixins = const [],
+  List<String> interfaces = const [],
 }) {
   if (declaration.declaredFragment == null) {
     throw StateError('''
@@ -99,6 +102,9 @@ Declaration _parseDeclaration(
     endLine: lineInfo.getLocation(groupEnd ?? declaration.end).lineNumber,
     path: path,
     parent: parent,
+    superclass: superclass,
+    mixins: mixins,
+    interfaces: interfaces,
   );
 
   // print('''
@@ -174,6 +180,29 @@ void _parseCompoundDeclaration(
 
   _logger.fine('Parsing compound declaration $name');
 
+  String? superclass;
+  final List<String> mixins = [];
+  final List<String> interfaces = [];
+
+  if (declaration is ast.ClassDeclaration) {
+    final extendsClause = declaration.extendsClause;
+    if (extendsClause != null) {
+      superclass = extendsClause.superclass.name.lexeme;
+    }
+    final withClause = declaration.withClause;
+    if (withClause != null) {
+      for (final m in withClause.mixinTypes) {
+        mixins.add(m.name.lexeme);
+      }
+    }
+    final implementsClause = declaration.implementsClause;
+    if (implementsClause != null) {
+      for (final i in implementsClause.interfaces) {
+        interfaces.add(i.name.lexeme);
+      }
+    }
+  }
+
   final parent = _parseDeclaration(
     declaration,
     lineInfo,
@@ -181,6 +210,9 @@ void _parseCompoundDeclaration(
     content,
     name: name,
     groupEnd: signatureEnd,
+    superclass: superclass,
+    mixins: mixins,
+    interfaces: interfaces,
   );
 
   visitedDeclarations[parent.id] = parent;

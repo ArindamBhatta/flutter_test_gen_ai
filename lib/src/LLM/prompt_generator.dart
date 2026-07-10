@@ -14,6 +14,7 @@ class PromptGenerator {
   String testCode(
     String toBeTestedCode, // code to be tested
     String contextCode, // context code
+    {String? hint}
   ) {
     final buffer = StringBuffer();
 
@@ -31,6 +32,13 @@ class PromptGenerator {
   ```dart
   $contextCode
   ```
+  ''');
+    }
+
+    if (hint != null && hint.trim().isNotEmpty) {
+      buffer.writeln('''
+  Additional Context and Requirements:
+  $hint
   ''');
     }
 

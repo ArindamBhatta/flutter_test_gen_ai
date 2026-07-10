@@ -120,6 +120,7 @@ class TestGenerator {
     required String toBeTestedCode,
     required String contextCode,
     required String fileName,
+    String? hint,
   }) async {
     final GeminiChat chat = model.startChat();
     TestStatus status = TestStatus.failed;
@@ -128,7 +129,7 @@ class TestGenerator {
 
     final TestFile testFile = TestFile(packagePath, fileName);
 
-    String prompt = promptGenerator.testCode(toBeTestedCode, contextCode);
+    String prompt = promptGenerator.testCode(toBeTestedCode, contextCode, hint: hint);
 
     int attempt = 1;
     for (; attempt <= maxRetries && status == TestStatus.failed; attempt++) {

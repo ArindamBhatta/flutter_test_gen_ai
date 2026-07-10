@@ -368,6 +368,29 @@ Future<void> main(List<String> arguments) async {
     "Extracted ${declarations.length} declarations from the package",
   );
 
+  // Automatically check if we need to add bloc_test to dev_dependencies
+  final bool hasBloc = declarations.any((decl) => decl.isBloc || decl.isCubit);
+  if (hasBloc) {
+    if (!deps.contains('bloc_test')) {
+      _logger.info(
+        'Bloc/Cubit declaration detected but "bloc_test" is not in dependencies. '
+        'Running "dart pub add bloc_test --dev" to support bloc testing...',
+      );
+      final process = await Process.run('dart', [
+        'pub',
+        'add',
+        'bloc_test',
+        '--dev',
+      ], workingDirectory: flags.package);
+      if (process.exitCode != 0) {
+        _logger.shout('Failed to run dart pub add bloc_test --dev: ${process.stderr}');
+      } else {
+        _logger.info('Successfully added "bloc_test" dev dependency.');
+        deps.add('bloc_test');
+      }
+    }
+  }
+
   // Group the declarations by the file they belong to
   final Map<String, List<Declaration>> declarationsByFile = {};
 
@@ -464,12 +487,29 @@ Future<void> main(List<String> arguments) async {
     // Step 7b: Query the LLM to generate tests
     _logger.info('Sending request to Gemini LLM to generate tests...');
 
+    String? hint;
+    if (declaration.isBloc) {
+      hint = 'This class is a Bloc. Use the "bloc_test" package to write tests for it. '
+             'Avoid calling handlers or states manually when "blocTest" is more appropriate. '
+             'Do not mock the bloc itself; mock its dependencies instead.';
+    } else if (declaration.isCubit) {
+      hint = 'This class is a Cubit. Use the "bloc_test" package to write tests for it. '
+             'Specifically, use "blocTest" from the "bloc_test" package to assert states emitted. '
+             'Do not mock the cubit itself; mock its dependencies instead.';
+    } else if (declaration.isRiverpod) {
+      hint = 'This class is a Riverpod Notifier/StateNotifier. '
+             'Please test it using standard Riverpod unit testing conventions, '
+             'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
+             'Make sure to dispose the ProviderContainer at the end of the test.';
+    }
+
     //call Generate method
     final result = await testGenerator.generate(
       toBeTestedCode: toBeTestedCode,
       contextCode: contextCode,
       fileName:
           '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
+      hint: hint,
     );
 
     _logger.info('LLM response received. Status: ${result.status}');
