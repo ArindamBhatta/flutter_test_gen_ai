@@ -1,10 +1,10 @@
 # TestGen Coverage & Dependency Report
-Generated on: 2026-07-10 06:06:31 UTC
+Generated on: 2026-07-11 08:36:23 UTC
 
 ## Summary of Test Generation
-- **Total Declarations:** 10
+- **Total Declarations:** 19
 - **Already Fully Tested:** 10 ✅
-- **Newly Tested (This Run):** 0 🎉
+- **Newly Tested (This Run):** 9 🎉
 - **Remaining Untested/Partial:** 0 ⚠️
 
 ---
@@ -17,33 +17,56 @@ graph TD
   classDef newlyTested fill:#d9e1f2,stroke:#305496,stroke-width:2px,stroke-dasharray: 5 5;
   classDef untested fill:#fce4d6,stroke:#c65911,stroke-width:2px;
 
-  subgraph Parent_38339 ["TicTacToe - ✅ (Already Tested)"]
-    node_38340["board() - ✅ (Already Tested)"]:::alreadyTested
-    node_38347["currentPlayer() - ✅ (Already Tested)"]:::alreadyTested
-    node_38354["winner() - ✅ (Already Tested)"]:::alreadyTested
-    node_38361["isGameOver() - ✅ (Already Tested)"]:::alreadyTested
-    node_38368["TicTacToe() - ✅ (Already Tested)"]:::alreadyTested
-    node_38369["resetBoard() - ✅ (Already Tested)"]:::alreadyTested
-    node_38370["makeMove() - ✅ (Already Tested)"]:::alreadyTested
-    node_38371["checkWinner() - ✅ (Already Tested)"]:::alreadyTested
-    node_38372["isBoardFull() - ✅ (Already Tested)"]:::alreadyTested
+  subgraph Parent_58061 ["TicTacToe - ✅ (Already Tested)"]
+    node_58063["grid() - ✅ (Already Tested)"]:::alreadyTested
+    node_58066["PLAYER_X() - ✅ (Already Tested)"]:::alreadyTested
+    node_58069["PLAYER_O() - ✅ (Already Tested)"]:::alreadyTested
+    node_58072["currentPlayer() - ✅ (Already Tested)"]:::alreadyTested
+    node_58079["TicTacToe() - ✅ (Already Tested)"]:::alreadyTested
+    node_58080["run() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58081["printGrid() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58082["isGameOver() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58083["hasWinner() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58084["isRowWin() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58085["isColWin() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58086["isDiag1Win() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+    node_58087["isDiag2Win() - ✅ (Already Tested)"]:::alreadyTested
+    node_58088["isFull() - 🎉 ✅ (Newly Tested)"]:::newlyTested
+  end
+
+  subgraph Parent_58062 ["Scanner - ✅ (Already Tested)"]
+    node_58089["_tokens() - ✅ (Already Tested)"]:::alreadyTested
+    node_58092["_tokenIndex() - ✅ (Already Tested)"]:::alreadyTested
+    node_58099["nextInt() - 🎉 ✅ (Newly Tested)"]:::newlyTested
   end
 
   %% Dependency Lines
-  node_38368 --> node_38339
-  node_38368 --> node_38369
-  node_38369 --> node_38340
-  node_38369 --> node_38347
-  node_38369 --> node_38354
-  node_38369 --> node_38361
-  node_38370 --> node_38340
-  node_38370 --> node_38347
-  node_38370 --> node_38354
-  node_38370 --> node_38361
-  node_38370 --> node_38371
-  node_38370 --> node_38372
-  node_38371 --> node_38340
-  node_38372 --> node_38340
+  node_58072 --> node_58066
+  node_58079 --> node_58061
+  node_58079 --> node_58063
+  node_58080 --> node_58066
+  node_58080 --> node_58063
+  node_58080 --> node_58062
+  node_58080 --> node_58081
+  node_58080 --> node_58072
+  node_58080 --> node_58099
+  node_58080 --> node_58082
+  node_58080 --> node_58083
+  node_58080 --> node_58069
+  node_58081 --> node_58063
+  node_58082 --> node_58083
+  node_58082 --> node_58088
+  node_58083 --> node_58084
+  node_58083 --> node_58085
+  node_58083 --> node_58086
+  node_58083 --> node_58087
+  node_58084 --> node_58063
+  node_58085 --> node_58063
+  node_58086 --> node_58063
+  node_58087 --> node_58063
+  node_58088 --> node_58063
+  node_58099 --> node_58092
+  node_58099 --> node_58089
 ```
 
 ### Legend
