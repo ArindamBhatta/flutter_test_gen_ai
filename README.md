@@ -1,6 +1,6 @@
 # 🚀 Flutter AI Test Generator (`flutter_test_gen_ai`)
 
-An intelligent, coverage-driven test generation CLI tool for Dart and Flutter applications. Powered by Google Gemini, it automatically identifies untested code, gathers surrounding dependency context, and writes, runs, and self-corrects test cases until your test coverage increases.
+An intelligent, coverage-driven test generation CLI tool for Dart and Flutter applications. Powered by Google Gemini, it automatically identifies untested code (including business logic, state management, repositories, services, and **Flutter UI Widgets**), gathers surrounding dependency context, and writes, runs, and self-corrects test cases until your test coverage increases.
 
 ---
 
@@ -30,7 +30,12 @@ dart run flutter_test_gen_ai --target-files lib/counter_cubit.dart,lib/src/auth_
 > [!TIP]
 > Always target specific files during development to speed up execution and focus Gemini on the code you are actively working on.
 
-### 📈 2. Keep Only Effective Tests (Highly Recommended)
+### 🎨 2. Smart Flutter Widget & State Testing
+The tool statically analyzes your project to handle advanced architectures out-of-the-box:
+* **State Management**: Generates Cubit and BLoC tests using the `bloc_test` package.
+* **Widget Testing**: For highly reliable UI testing, add `Semantics` labels and unique `Key` parameters to your widgets. The generator automatically discovers them and generates clean `testWidgets()` suites.
+
+### 📈 3. Keep Only Effective Tests (Highly Recommended)
 If you only want to save tests that *actually improve* your code coverage (discarding redundant or duplicate tests):
 ```bash
 dart run flutter_test_gen_ai -e
@@ -38,7 +43,7 @@ dart run flutter_test_gen_ai -e
 dart run flutter_test_gen_ai --effective-tests-only
 ```
 
-### 📊 3. Generate Visual Coverage Diagrams
+### 📊 4. Generate Visual Coverage Diagrams
 To automatically generate a color-coded dependency and coverage flowchart (`testgen_report.md`) utilizing Mermaid:
 ```bash
 dart run flutter_test_gen_ai --generate-report
@@ -47,7 +52,7 @@ dart run flutter_test_gen_ai --generate-report
 * **Blue Nodes**: Covered by newly generated tests in this run.
 * **Orange Nodes**: Code still lacking coverage.
 
-### 🧠 4. Tune the AI Generator & Context
+### 🧠 5. Tune the AI Generator & Context
 * **Switch Models**: Use a different Gemini model if you hit limits or need more power:
   ```bash
   dart run flutter_test_gen_ai --model gemini-3-flash-preview
@@ -61,7 +66,7 @@ dart run flutter_test_gen_ai --generate-report
   dart run flutter_test_gen_ai --max-attempts 3
   ```
 
-### 🔍 5. Debugging & Verbose Mode
+### 🔍 6. Debugging & Verbose Mode
 If a test keeps failing validation and gets deleted, use verbose mode to write the full prompts and LLM conversation history to `testgen_prompts.log` for inspection:
 ```bash
 dart run flutter_test_gen_ai -v
@@ -91,5 +96,14 @@ dart run flutter_test_gen_ai -v
 ## 📦 What the Tool Handles Automatically
 
 * **Framework Compatibility**: The tool automatically checks your `pubspec.yaml`. If it is a Flutter project, it collects coverage via `flutter test --coverage` (parsing the generated `lcov.info`). If it is a pure Dart project, it collects coverage directly from the Dart VM Service.
-* **Auto-installed Dependencies**: If your package is missing `test` or `bloc_test` (when Cubits/Blocs are parsed), the tool automatically adds them to your `dev_dependencies`.
+* **Flutter Widget Testing**: Automatically detects when it is testing a widget class (subclassing `StatelessWidget`, `StatefulWidget`, or `State`). It parses the widget's `build` method to identify `Semantics` labels and `Key` annotations, feeding these UI elements directly to Gemini's prompt to generate compile-safe widget tests (preventing selector hallucinations).
+* **Auto-installed Dependencies**: If your package is missing `test`, `bloc_test`, or mocking packages (when state management or data/service layers are parsed), the tool automatically adds them to your `dev_dependencies`.
 * **Quarantined Output**: All generated tests are written to `test/testgen/` to keep them clean and separated from your hand-written test files.
+
+### 💡 Testing Dart Code Result
+
+![Testing Dart Code Result](./example/tic_tac_toe/testgen_report.md)
+
+### 💡 Testing Flutter Code Result
+
+![Testing Flutter Code Result](./example/)
