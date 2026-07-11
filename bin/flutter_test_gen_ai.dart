@@ -505,6 +505,18 @@ Future<void> main(List<String> arguments) async {
       hint = testGenerator.promptGenerator.widgetPromptHint(declaration.uiElements);
     }
 
+    String? subFolder;
+    if (declaration.isWidget) {
+      subFolder = 'widget_test';
+    } else {
+      final pathLower = declaration.path.toLowerCase();
+      if (pathLower.contains('service') || pathLower.contains('repository') || pathLower.contains('repo')) {
+        subFolder = 'integration_test';
+      } else {
+        subFolder = 'unit_test';
+      }
+    }
+
     //call Generate method
     final result = await testGenerator.generate(
       toBeTestedCode: toBeTestedCode,
@@ -512,6 +524,7 @@ Future<void> main(List<String> arguments) async {
       fileName:
           '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
       hint: hint,
+      subFolder: subFolder,
     );
 
     _logger.info('LLM response received. Status: ${result.status}');

@@ -1,0 +1,29 @@
+name: my_web_app
+description: "A new Flutter project."
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_bloc: ^9.1.1
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  test: ^1.30.0
+  bloc_test: ^10.0.0
+  flutter_test_gen_ai:
+    path: ../../
+  mockito: ^5.6.4
+  mocktail: ^1.0.5
+
+flutter:
+  uses-material-design: true

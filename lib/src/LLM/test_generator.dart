@@ -119,13 +119,14 @@ class TestGenerator {
     required String contextCode,
     required String fileName,
     String? hint,
+    String? subFolder,
   }) async {
     final GeminiChat chat = model.startChat();
     TestStatus status = TestStatus.failed;
 
     Duration backoff = initialBackoff;
 
-    final TestFile testFile = TestFile(packagePath, fileName);
+    final TestFile testFile = TestFile(packagePath, fileName, subFolder: subFolder);
 
     String prompt = promptGenerator.testCode(
       toBeTestedCode,

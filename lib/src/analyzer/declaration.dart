@@ -126,7 +126,14 @@ class Declaration {
 
   /// Stores UI elements parsed from this widget.
   /// Format: {"label": "login_button", "type": "button", "key": "login_btn"}
-  final List<Map<String, String>> uiElements = [];
+  final List<Map<String, String>> _uiElements = [];
+
+  List<Map<String, String>> get uiElements {
+    if (parent != null && parent!.isWidget) {
+      return parent!.uiElements;
+    }
+    return _uiElements;
+  }
 
   void addDependency(Declaration declaration) {
     if (declaration.id == id) {

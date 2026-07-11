@@ -24,11 +24,12 @@ class TestFile {
   int testErrors = 0;
 
   // Why? It ensures all LLM-generated test files are quarantined in a specific subdirectory (test/testgen/). This keeps them isolated from the project's hand-written tests and makes bulk cleanup easy.
-  TestFile(this.packagePath, String fileName)
+  TestFile(this.packagePath, String fileName, {String? subFolder})
     : testFilePath = path.join(
         packagePath,
         'test',
         'testgen',
+        subFolder ?? '',
         fileName.toLowerCase(),
       );
 
