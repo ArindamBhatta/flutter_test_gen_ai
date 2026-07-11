@@ -106,4 +106,4 @@ dart run flutter_test_gen_ai -v
 
 ### 💡 Testing Flutter Code Result
 
-![Testing Flutter Code Result](./example/)
+![Testing Flutter Code Result](./example/todo_app/testgen_report.md)
