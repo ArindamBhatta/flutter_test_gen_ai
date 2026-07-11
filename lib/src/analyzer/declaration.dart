@@ -118,6 +118,16 @@ class Declaration {
     return riverpodClasses.contains(baseName);
   }
 
+  /// Whether the declaration is a Flutter StatelessWidget or StatefulWidget or State class
+  bool get isWidget =>
+      classSuperclass == 'StatelessWidget' ||
+      classSuperclass == 'StatefulWidget' ||
+      classSuperclass == 'State';
+
+  /// Stores UI elements parsed from this widget.
+  /// Format: {"label": "login_button", "type": "button", "key": "login_btn"}
+  final List<Map<String, String>> uiElements = [];
+
   void addDependency(Declaration declaration) {
     if (declaration.id == id) {
       throw ArgumentError(

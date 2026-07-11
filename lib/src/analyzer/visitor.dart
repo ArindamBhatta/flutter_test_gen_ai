@@ -128,3 +128,62 @@ class CompoundDependencyVisitor extends DependencyVisitor {
     _visitImplementsClause(node.implementsClause);
   }
 }
+
+class WidgetVisitor extends RecursiveAstVisitor<void> {
+  final List<Map<String, String>> elements = [];
+
+  @override
+  void visitInstanceCreationExpression(ast.InstanceCreationExpression node) {
+    final constructorName = node.constructorName.type.name.lexeme;
+
+    // 1. Check for Semantics widgets
+    if (constructorName == 'Semantics') {
+      ast.NamedExpression? labelArg;
+      for (final arg in node.argumentList.arguments) {
+        if (arg is ast.NamedExpression && arg.name.label.name == 'label') {
+          labelArg = arg;
+          break;
+        }
+      }
+
+      bool isButton = false;
+      for (final arg in node.argumentList.arguments) {
+        if (arg is ast.NamedExpression &&
+            arg.name.label.name == 'button' &&
+            arg.expression.toString() == 'true') {
+          isButton = true;
+          break;
+        }
+      }
+
+      if (labelArg != null) {
+        // Extract the literal value of the label (e.g., 'login_button')
+        final labelVal =
+            labelArg.expression.toString().replaceAll(RegExp("['\"]"), '');
+        elements.add({
+          'label': labelVal,
+          'type': isButton ? 'button' : 'element',
+        });
+      }
+    }
+
+    // 2. Check for widget Keys (e.g., Key('email_field'))
+    ast.NamedExpression? keyArg;
+    for (final arg in node.argumentList.arguments) {
+      if (arg is ast.NamedExpression && arg.name.label.name == 'key') {
+        keyArg = arg;
+        break;
+      }
+    }
+
+    if (keyArg != null) {
+      final keyVal = keyArg.expression.toString();
+      elements.add({
+        'key': keyVal,
+        'type': 'widget_key',
+      });
+    }
+
+    super.visitInstanceCreationExpression(node);
+  }
+}

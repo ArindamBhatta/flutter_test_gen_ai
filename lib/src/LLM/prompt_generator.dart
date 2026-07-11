@@ -124,4 +124,29 @@ class PromptGenerator {
   Fix these issues and return only the corrected, complete test code.
   ''';
   }
+
+  String widgetPromptHint(List<Map<String, String>> uiElements) {
+    final buffer = StringBuffer();
+    buffer.writeln('This class is a Flutter Widget.');
+    buffer.writeln('Generate a Flutter Widget Test using "package:flutter_test/flutter_test.dart".');
+    buffer.writeln('Use "testWidgets(..., (WidgetTester tester) async { ... })".');
+    buffer.writeln('\nYou MUST use the following identified UI element keys and semantics labels to interact with the UI:');
+    
+    for (final elem in uiElements) {
+      if (elem.containsKey('label')) {
+        buffer.writeln('- Semantics Label: "${elem['label']}" (Type: ${elem['type']}). Find using: find.bySemanticsLabel("${elem['label']}")');
+      }
+      if (elem.containsKey('key')) {
+        buffer.writeln('- Widget Key: ${elem['key']}. Find using: find.byKey(const ${elem['key']})');
+      }
+    }
+    
+    buffer.writeln('\nGuidelines:');
+    buffer.writeln('- Use "await tester.pumpWidget(MaterialApp(home: YourWidget()))" to load the widget.');
+    buffer.writeln('- Use "await tester.tap(finder)" and "await tester.enterText(finder, text)" for user interactions.');
+    buffer.writeln('- Call "await tester.pumpAndSettle()" after interactions to let animations complete.');
+    buffer.writeln('- Assert UI states using expect(finder, findsOneWidget) or similar assertions.');
+    
+    return buffer.toString();
+  }
 }

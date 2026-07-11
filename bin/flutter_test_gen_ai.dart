@@ -501,6 +501,8 @@ Future<void> main(List<String> arguments) async {
              'Please test it using standard Riverpod unit testing conventions, '
              'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
              'Make sure to dispose the ProviderContainer at the end of the test.';
+    } else if (declaration.isWidget) {
+      hint = testGenerator.promptGenerator.widgetPromptHint(declaration.uiElements);
     }
 
     //call Generate method

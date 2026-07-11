@@ -220,6 +220,12 @@ void _parseCompoundDeclaration(
     CompoundDependencyVisitor(declaration, parent, dependencies),
   );
 
+  if (parent.isWidget) {
+    final widgetVisitor = WidgetVisitor();
+    declaration.accept(widgetVisitor);
+    parent.uiElements.addAll(widgetVisitor.elements);
+  }
+
   _parseClassMembers(
     members,
     visitedDeclarations,
