@@ -5,6 +5,7 @@ This directory contains examples demonstrating how to use `flutter_test_gen_ai` 
 ## 📁 Included Examples
 
 1. **[tic_tac_toe](./tic_tac_toe/)**: A command-line Tic-Tac-Toe application built with pure Dart.
+
 2. **[todo_app](./todo_app/)**: A mobile Todo application built with Flutter, utilizing `flutter_bloc` for state management.
 
 ---

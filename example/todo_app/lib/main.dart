@@ -6,13 +6,12 @@ import 'todo_repository.dart';
 import 'todo_cubit.dart';
 
 void main() {
-  final todoService = TodoService();
-  final todoRepository = TodoRepository(service: todoService);
-
   runApp(
     MultiRepositoryProvider(
       providers: [
-        RepositoryProvider<TodoRepository>.value(value: todoRepository),
+        RepositoryProvider(
+          create: (_) => TodoRepository(service: TodoService()),
+        ),
       ],
       child: const TodoApp(),
     ),

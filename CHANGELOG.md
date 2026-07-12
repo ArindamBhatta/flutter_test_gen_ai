@@ -1,4 +1,4 @@
-## 0.2.1
+## 0.2.2
 
 - Fixed analyzer API compatibility issues for newer Dart/Flutter SDKs.
 - Focused documentation and usage instructions purely on local CLI execution.

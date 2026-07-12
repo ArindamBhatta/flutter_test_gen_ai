@@ -21,7 +21,7 @@ export GEMINI_API_KEY="your-api-key-here"
 ### 3. Run the Tool
 To scan and generate tests for your entire package:
 ```bash
-dart run flutter_test_gen_ai --api-key $GEMINI_API_KEY
+dart run flutter_test_gen_ai --api-key $GEMINI_API_KEY --generate-report 
 ```
 
 ---

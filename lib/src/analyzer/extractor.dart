@@ -40,8 +40,6 @@ Future<List<Declaration>> extractDeclarations(
       .map((file) => file.path)
       .toList();
 
-  // print("parsing all dart files ---->: $dartFiles");
-
   final Map<int, Declaration> visitedDeclarations = <int, Declaration>{};
   final Map<int, List<Declaration>> dependencies = <int, List<Declaration>>{};
 
@@ -67,11 +65,6 @@ Future<List<Declaration>> extractDeclarations(
       );
     }
   }
-
-  // print('''
-  //       Map<int, Declaration> visitedDeclarations:
-  //       $visitedDeclarations
-  //       ''');
 
   for (final MapEntry(key: id, value: declarations) in dependencies.entries) {
     if (visitedDeclarations.containsKey(id)) {
@@ -110,13 +103,6 @@ untestedDeclaration
 
 List<(Declaration, List<int>)> extractUntestedDeclarations(
   Map<String, List<Declaration>> declarations,
-  /*
-     coverageResults List<(String, List<int>)>
-     [
-        ('lib/example/example.dart', [3, 4, 5, 6, 7, 8]),
-        ('lib/example/example2.dart', [1, 2, 3, 4, 5, 6]),
-     ]
-  */
   CoverageData coverageResults,
 ) {
   final untestedDeclarations = <(Declaration, List<int>)>[];

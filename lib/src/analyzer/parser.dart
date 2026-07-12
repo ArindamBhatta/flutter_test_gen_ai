@@ -107,16 +107,6 @@ Declaration _parseDeclaration(
     mixins: mixins,
     interfaces: interfaces,
   );
-
-  // print('''
-  //   👷 👷 👷 Created new 👷 👷 👷
-  //   Declaration(
-  //     id: ${decl.id}
-  //     name: ${decl.name}
-  //     sourceCode: ${decl.sourceCode}
-  //     Path: ${decl.path}
-  //     Parent: ${decl.parent?.name}
-  //   ''');
   return decl;
 }
 
@@ -160,9 +150,18 @@ void _parseCompoundDeclaration(
   String content,
 ) {
   final (String? name, List<ast.ClassMember> members) = switch (declaration) {
-    ast.ClassDeclaration(:final namePart, :final body) => (namePart.typeName.lexeme, body.members),
-    ast.MixinDeclaration(:final name, :final body) => (name.lexeme, body.members),
-    ast.EnumDeclaration(:final namePart, :final body) => (namePart.typeName.lexeme, body.members),
+    ast.ClassDeclaration(:final namePart, :final body) => (
+      namePart.typeName.lexeme,
+      body.members,
+    ),
+    ast.MixinDeclaration(:final name, :final body) => (
+      name.lexeme,
+      body.members,
+    ),
+    ast.EnumDeclaration(:final namePart, :final body) => (
+      namePart.typeName.lexeme,
+      body.members,
+    ),
     ast.ExtensionTypeDeclaration(:final namePart, :final body) => (
       namePart.typeName.lexeme,
       body.members,

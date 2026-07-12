@@ -26,10 +26,10 @@ class TodoCubit extends Cubit<TodoState> {
   Future<void> loadTodos() async {
     emit(TodoLoading());
     try {
-      final todos = await repository.getTodos();
+      final List<Todo> todos = await repository.getTodos();
       emit(TodoLoaded(todos));
-    } catch (e) {
-      emit(TodoError('Failed to load todos: $e'));
+    } catch (error) {
+      emit(TodoError('Failed to load todos: $error'));
     }
   }
 
@@ -38,8 +38,8 @@ class TodoCubit extends Cubit<TodoState> {
     try {
       await repository.createTodo(title);
       await loadTodos();
-    } catch (e) {
-      emit(TodoError('Failed to add todo: $e'));
+    } catch (error) {
+      emit(TodoError('Failed to add todo: $error'));
     }
   }
 
