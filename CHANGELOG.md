@@ -1,3 +1,11 @@
+## 0.2.3
+
+- Registered public library exports in `lib/flutter_test_gen_ai.dart` to support programmatic scripting and library integration.
+- Added a compile-safe programmatic usage demonstration to `example/example.dart`.
+- Added an explanation section at the bottom of the generated markdown reports (`testgen_report.md`) detailing why some tests fail (e.g., hardcoded global standard I/O, platform channels).
+- Cleaned up package footprint using `.pubignore` to exclude local model assets and development configs.
+- Disables global CLI configuration in `pubspec.yaml` to ensure pub.dev displays standard dev_dependencies installation instructions.
+
 ## 0.2.2
 
 - Fixed analyzer API compatibility issues for newer Dart/Flutter SDKs.
