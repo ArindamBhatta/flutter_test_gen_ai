@@ -1,3 +1,8 @@
+## 0.2.4
+
+- Improved subprocess diagnostics by reporting standard output (`stdout`) alongside standard error (`stderr`) when `flutter test --coverage` fails.
+- Handled `ProcessException` gracefully at the CLI entry point to print user-friendly troubleshooting details instead of crashing with a raw unhandled exception.
+
 ## 0.2.3
 
 - Registered public library exports in `lib/flutter_test_gen_ai.dart` to support programmatic scripting and library integration.
