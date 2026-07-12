@@ -35,6 +35,3 @@ dev_dependencies:
   lints: ^6.0.0
   mockito: ^5.6.5
   test: ^1.29.0
-
-executables:
-  flutter_test_gen_ai:

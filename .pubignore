@@ -1,0 +1,7 @@
+.vscode/
+.idea/
+.dart_tool/
+brain/
+*.log
+pubspec.lock
+example/todo_app/pubspec.lock
