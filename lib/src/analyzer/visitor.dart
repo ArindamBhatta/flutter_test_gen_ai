@@ -1,9 +1,8 @@
-// Scans the raw Dart source code line by line, finds where methods/classes talk to each other, and groups them by ID in that map using /putIfAbsent.
-
 import 'package:analyzer/dart/ast/ast.dart' as ast;
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
+
+import 'declaration.dart';
 
 class DependencyVisitor extends RecursiveAstVisitor<void> {
   final ast.Declaration astNode;
@@ -32,11 +31,6 @@ class DependencyVisitor extends RecursiveAstVisitor<void> {
     _addDependencyById(element?.id);
 
     if (element is PropertyAccessorElement) {
-      // print('''
-      // ✅  ✅  ✅  ✅  ✅  ✅
-      // Underlying Variable ID: ${element.variable.id}
-      // Declaration ID: ${declaration.id}
-      // ''');
       _addDependencyById(element.variable.id);
     }
     super.visitSimpleIdentifier(node);

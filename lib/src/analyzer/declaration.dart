@@ -190,14 +190,35 @@ class MermaidReporter {
       'Generated on: ${DateTime.now().toUtc().toIso8601String().replaceAll("T", " ").substring(0, 19)} UTC\n',
     );
 
+    // Separate top-level/class declarations from nested/method/function declarations
+    final topLevel = allDeclarations.where((d) => d.parent == null).toList();
+    final nested = allDeclarations.where((d) => d.parent != null).toList();
+
+    // Group nested declarations by parent ID
+    final childrenMap = <int, List<Declaration>>{};
+    for (final child in nested) {
+      childrenMap.putIfAbsent(child.parent!.id, () => []).add(child);
+    }
+
+    // Helper to identify leaf declarations (actual testable components)
+    bool isLeaf(Declaration decl) {
+      if (decl.parent != null) return true;
+      final children = childrenMap[decl.id];
+      return children == null || children.isEmpty;
+    }
+
     buffer.writeln('## Summary of Test Generation');
 
-    // Count stats
+    // Count stats based on leaf declarations only
+    int totalCount = 0;
     int alreadyTestedCount = 0;
     int newlyTestedCount = 0;
     int remainingUntestedCount = 0;
 
     for (final decl in allDeclarations) {
+      if (!isLeaf(decl)) continue;
+      totalCount++;
+
       final wasUntested = initialUncoveredLines.containsKey(decl.id);
       final isUntested = finalUncoveredLines.containsKey(decl.id);
 
@@ -210,7 +231,7 @@ class MermaidReporter {
       }
     }
 
-    buffer.writeln('- **Total Declarations:** ${allDeclarations.length}');
+    buffer.writeln('- **Total Declarations:** $totalCount');
     buffer.writeln('- **Already Fully Tested:** $alreadyTestedCount ✅');
     buffer.writeln('- **Newly Tested (This Run):** $newlyTestedCount 🎉');
     buffer.writeln(
@@ -220,89 +241,117 @@ class MermaidReporter {
     buffer.writeln('---');
     buffer.writeln('## Declaration Relationship & Coverage Map\n');
     buffer.writeln('```mermaid');
-    buffer.writeln('graph TD');
+    buffer.writeln('graph LR');
     buffer.writeln('  %% Styling');
     buffer.writeln(
-      '  classDef alreadyTested fill:#e2f0d9,stroke:#385723,stroke-width:2px;',
+      '  classDef fullyCovered fill:#ffffff,stroke:#2e7d32,stroke-width:2px,color:#333333;',
     );
     buffer.writeln(
-      '  classDef newlyTested fill:#d9e1f2,stroke:#305496,stroke-width:2px,stroke-dasharray: 5 5;',
+      '  classDef newlyCovered fill:#ffffff,stroke:#1565c0,stroke-width:2px,stroke-dasharray: 5 5,color:#333333;',
     );
     buffer.writeln(
-      '  classDef untested fill:#fce4d6,stroke:#c65911,stroke-width:2px;\n',
+      '  classDef needsCoverage fill:#ffffff,stroke:#c62828,stroke-width:2px,color:#333333;\n',
     );
 
-    // 2. Separate top-level/class declarations from nested/method/function declarations
-    final topLevel = allDeclarations.where((d) => d.parent == null).toList();
-    final nested = allDeclarations.where((d) => d.parent != null).toList();
+    // Helper to get style name for a parent (and all its children)
+    String getParentStyle(Declaration parent, List<Declaration> children) {
+      bool wasUntested = false;
+      bool isUntested = false;
 
-    // Group nested declarations by parent ID
-    final childrenMap = <int, List<Declaration>>{};
-    for (final child in nested) {
-      childrenMap.putIfAbsent(child.parent!.id, () => []).add(child);
-    }
-
-    // Helper to get status string and style name
-    (String, String) getDeclarationStatus(Declaration decl) {
-      final wasUntested = initialUncoveredLines.containsKey(decl.id);
-      final isUntested = finalUncoveredLines.containsKey(decl.id);
-
-      if (!wasUntested) {
-        return ('✅ (Already Tested)', 'alreadyTested');
-      } else if (!isUntested) {
-        return ('🎉 ✅ (Newly Tested)', 'newlyTested');
-      } else {
-        final linesCount = finalUncoveredLines[decl.id]?.length ?? 0;
-        return ('⚠️ (Needs Coverage: $linesCount lines)', 'untested');
+      // Check parent
+      if (initialUncoveredLines.containsKey(parent.id)) {
+        wasUntested = true;
       }
-    }
+      if (finalUncoveredLines.containsKey(parent.id)) {
+        isUntested = true;
+      }
 
-    // 3. Generate subgraphs for top-level classes/files and their children
-    for (final parent in topLevel) {
-      final (parentLabel, parentStyle) = getDeclarationStatus(parent);
-
-      buffer.writeln(
-        '  subgraph Parent_${parent.id} ["${parent.name} - $parentLabel"]',
-      );
-
-      final children = childrenMap[parent.id] ?? [];
-      if (children.isEmpty) {
-        // Parent declaration has no nested children, define it as a standalone node in the subgraph
-        buffer.writeln(
-          '    node_${parent.id}["${parent.name}"]:::$parentStyle',
-        );
-      } else {
-        for (final child in children) {
-          final (childLabel, childStyle) = getDeclarationStatus(child);
-          buffer.writeln(
-            '    node_${child.id}["${child.name}() - $childLabel"]:::$childStyle',
-          );
+      // Check children
+      for (final child in children) {
+        if (initialUncoveredLines.containsKey(child.id)) {
+          wasUntested = true;
+        }
+        if (finalUncoveredLines.containsKey(child.id)) {
+          isUntested = true;
         }
       }
-      buffer.writeln('  end\n');
+
+      if (!wasUntested) {
+        return 'fullyCovered';
+      } else if (!isUntested) {
+        return 'newlyCovered';
+      } else {
+        return 'needsCoverage';
+      }
     }
 
-    // 4. Draw dependency relationships
-    buffer.writeln('  %% Dependency Lines');
+    // 3. Generate parent nodes
+    for (final parent in topLevel) {
+      final children = childrenMap[parent.id] ?? [];
+      final parentStyle = getParentStyle(parent, children);
+      buffer.writeln(
+        '  node_${parent.id}["${parent.name}"]:::$parentStyle',
+      );
+    }
+
+    // 4. Draw dependency relationships between top-level parents only
+    buffer.writeln('\n  %% Dependency Lines');
+    final parentDeps = <String>{};
     for (final decl in allDeclarations) {
+      final parent = decl.parent ?? decl;
       for (final dep in decl.dependsOn) {
-        final sourceNode = 'node_${decl.id}';
-        final targetNode = 'node_${dep.id}';
-        buffer.writeln('  $sourceNode --> $targetNode');
+        final depParent = dep.parent ?? dep;
+        if (parent.id != depParent.id) {
+          parentDeps.add('  node_${parent.id} --> node_${depParent.id}');
+        }
       }
+    }
+    for (final line in parentDeps) {
+      buffer.writeln(line);
     }
 
     buffer.writeln('```\n');
+
     buffer.writeln('### Legend');
     buffer.writeln(
-      '- **Green Box (Solid border)**: Already fully covered/tested.',
+      '- **Green Border (Solid)**: Already fully covered/tested.',
     );
     buffer.writeln(
-      '- **Blue Box (Dashed border)**: Newly generated tests successfully covered this declaration in this run.',
+      '- **Blue Border (Dashed)**: Newly generated tests successfully covered this declaration in this run.',
     );
     buffer.writeln(
-      '- **Orange Box (Solid border)**: Needs coverage. The line count indicates remaining uncovered lines.',
+      '- **Red Border (Solid)**: Needs coverage.\n',
     );
+
+    buffer.writeln('---');
+    buffer.writeln('## Coverage Breakdown by Class/File');
+    for (final parent in topLevel) {
+      final children = childrenMap[parent.id] ?? [];
+      final parentStyle = getParentStyle(parent, children);
+      
+      String parentStatus = '✅ Fully Covered';
+      if (parentStyle == 'newlyCovered') {
+        parentStatus = '🎉 Newly Covered';
+      } else if (parentStyle == 'needsCoverage') {
+        parentStatus = '⚠️ Needs Coverage';
+      }
+
+      buffer.writeln('\n### $parentStatus: `${parent.name}`');
+      
+      // If the parent has no children, list its own coverage status
+      if (children.isEmpty) {
+        final isUntested = finalUncoveredLines.containsKey(parent.id);
+        final statusIcon = isUntested ? '❌' : '✅';
+        buffer.writeln('- $statusIcon `${parent.name}`');
+      } else {
+        for (final child in children) {
+          final isUntested = finalUncoveredLines.containsKey(child.id);
+          final statusIcon = isUntested ? '❌' : '✅';
+          final linesInfo = isUntested ? ' (Lines: ${finalUncoveredLines[child.id]})' : '';
+          buffer.writeln('- $statusIcon `${child.name}`$linesInfo');
+        }
+      }
+    }
 
     return buffer.toString();
   }

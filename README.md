@@ -100,10 +100,7 @@ dart run flutter_test_gen_ai -v
 * **Auto-installed Dependencies**: If your package is missing `test`, `bloc_test`, or mocking packages (when state management or data/service layers are parsed), the tool automatically adds them to your `dev_dependencies`.
 * **Quarantined Output**: All generated tests are written to `test/testgen/` to keep them clean and separated from your hand-written test files.
 
-### 💡 Testing Dart Code Result
-
-![Testing Dart Code Result](./example/tic_tac_toe/testgen_report.md)
 
 ### 💡 Testing Flutter Code Result
 
-![Testing Flutter Code Result](./example/todo_app/testgen_report.md)
+![Testing Flutter Code Result](./doc/static/diagram.png)

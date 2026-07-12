@@ -1,9 +1,9 @@
 import 'dart:collection';
-import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
 
 import 'package:collection/collection.dart';
-
 import 'package:logging/logging.dart';
+
+import '../analyzer/declaration.dart';
 
 const indent = '   ';
 const newLine = '\n';

@@ -2,4 +2,4 @@
 // for coverage collection purposes, Don't modify or delete this file.
 import 'package:tic_tac_toe/tic_tac_toe.dart';
 
-void main() {}
+void main(){}
