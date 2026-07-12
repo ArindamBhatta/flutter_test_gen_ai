@@ -1,5 +1,7 @@
 import 'dart:io';
-import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/parser.dart';
+import 'package:flutter_test_gen_ai/src/coverage/coverage_collection.dart';
 
 import 'package:path/path.dart' as path;
 import 'package:analyzer/dart/analysis/analysis_context.dart';

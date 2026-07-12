@@ -35,9 +35,8 @@ class TodoApp extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
       home: BlocProvider(
-        create: (context) => TodoCubit(
-          repository: context.read<TodoRepository>(),
-        )..loadTodos(),
+        create: (context) =>
+            TodoCubit(repository: context.read<TodoRepository>())..loadTodos(),
         child: const TodoHomePage(title: 'TaskFlow'),
       ),
     );
@@ -132,7 +131,9 @@ class _TodoHomePageState extends State<TodoHomePage> {
                                 key: Key('checkbox_${todo.id}'),
                                 value: todo.isCompleted,
                                 onChanged: (_) {
-                                  context.read<TodoCubit>().toggleTodoStatus(todo);
+                                  context.read<TodoCubit>().toggleTodoStatus(
+                                    todo,
+                                  );
                                 },
                               ),
                             ),
@@ -149,7 +150,10 @@ class _TodoHomePageState extends State<TodoHomePage> {
                               button: true,
                               child: IconButton(
                                 key: Key('delete_${todo.id}'),
-                                icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.redAccent,
+                                ),
                                 onPressed: () {
                                   context.read<TodoCubit>().deleteTodo(todo.id);
                                 },

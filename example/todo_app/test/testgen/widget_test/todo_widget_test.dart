@@ -9,6 +9,7 @@ import 'package:my_web_app/todo_model.dart';
 import 'package:my_web_app/todo_repository.dart';
 
 class MockTodoCubit extends MockCubit<TodoState> implements TodoCubit {}
+
 class MockTodoRepository extends Mock implements TodoRepository {}
 
 void main() {
@@ -48,7 +49,9 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 
-  testWidgets('displays empty todos list correctly', (WidgetTester tester) async {
+  testWidgets('displays empty todos list correctly', (
+    WidgetTester tester,
+  ) async {
     when(() => mockTodoCubit.state).thenReturn(TodoLoaded([]));
 
     await tester.pumpWidget(buildTestableWidget());
@@ -69,13 +72,19 @@ void main() {
     expect(find.text('Buy milk'), findsOneWidget);
 
     // Verify Checkbox states using keys
-    final checkbox1 = tester.widget<Checkbox>(find.byKey(const Key('checkbox_1')));
-    final checkbox2 = tester.widget<Checkbox>(find.byKey(const Key('checkbox_2')));
+    final checkbox1 = tester.widget<Checkbox>(
+      find.byKey(const Key('checkbox_1')),
+    );
+    final checkbox2 = tester.widget<Checkbox>(
+      find.byKey(const Key('checkbox_2')),
+    );
     expect(checkbox1.value, isFalse);
     expect(checkbox2.value, isTrue);
   });
 
-  testWidgets('can add a new todo via textfield and button', (WidgetTester tester) async {
+  testWidgets('can add a new todo via textfield and button', (
+    WidgetTester tester,
+  ) async {
     when(() => mockTodoCubit.state).thenReturn(TodoLoaded([]));
     when(() => mockTodoCubit.addTodo(any())).thenAnswer((_) async {});
 

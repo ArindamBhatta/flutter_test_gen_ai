@@ -4,7 +4,7 @@ import 'todo_model.dart';
 class TodoService {
   final List<String> _localDatabase = [
     '{"id": "1", "title": "Buy groceries", "isCompleted": false}',
-    '{"id": "2", "title": "Implement flutter_test_gen_ai", "isCompleted": true}'
+    '{"id": "2", "title": "Implement flutter_test_gen_ai", "isCompleted": true}',
   ];
 
   Future<List<Todo>> fetchTodos() async {

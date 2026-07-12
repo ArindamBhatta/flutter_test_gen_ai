@@ -383,7 +383,9 @@ Future<void> main(List<String> arguments) async {
         '--dev',
       ], workingDirectory: flags.package);
       if (process.exitCode != 0) {
-        _logger.shout('Failed to run dart pub add bloc_test --dev: ${process.stderr}');
+        _logger.shout(
+          'Failed to run dart pub add bloc_test --dev: ${process.stderr}',
+        );
       } else {
         _logger.info('Successfully added "bloc_test" dev dependency.');
         deps.add('bloc_test');
@@ -489,20 +491,25 @@ Future<void> main(List<String> arguments) async {
 
     String? hint;
     if (declaration.isBloc) {
-      hint = 'This class is a Bloc. Use the "bloc_test" package to write tests for it. '
-             'Avoid calling handlers or states manually when "blocTest" is more appropriate. '
-             'Do not mock the bloc itself; mock its dependencies instead.';
+      hint =
+          'This class is a Bloc. Use the "bloc_test" package to write tests for it. '
+          'Avoid calling handlers or states manually when "blocTest" is more appropriate. '
+          'Do not mock the bloc itself; mock its dependencies instead.';
     } else if (declaration.isCubit) {
-      hint = 'This class is a Cubit. Use the "bloc_test" package to write tests for it. '
-             'Specifically, use "blocTest" from the "bloc_test" package to assert states emitted. '
-             'Do not mock the cubit itself; mock its dependencies instead.';
+      hint =
+          'This class is a Cubit. Use the "bloc_test" package to write tests for it. '
+          'Specifically, use "blocTest" from the "bloc_test" package to assert states emitted. '
+          'Do not mock the cubit itself; mock its dependencies instead.';
     } else if (declaration.isRiverpod) {
-      hint = 'This class is a Riverpod Notifier/StateNotifier. '
-             'Please test it using standard Riverpod unit testing conventions, '
-             'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
-             'Make sure to dispose the ProviderContainer at the end of the test.';
+      hint =
+          'This class is a Riverpod Notifier/StateNotifier. '
+          'Please test it using standard Riverpod unit testing conventions, '
+          'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
+          'Make sure to dispose the ProviderContainer at the end of the test.';
     } else if (declaration.isWidget) {
-      hint = testGenerator.promptGenerator.widgetPromptHint(declaration.uiElements);
+      hint = testGenerator.promptGenerator.widgetPromptHint(
+        declaration.uiElements,
+      );
     }
 
     String? subFolder;
@@ -510,7 +517,9 @@ Future<void> main(List<String> arguments) async {
       subFolder = 'widget_test';
     } else {
       final pathLower = declaration.path.toLowerCase();
-      if (pathLower.contains('service') || pathLower.contains('repository') || pathLower.contains('repo')) {
+      if (pathLower.contains('service') ||
+          pathLower.contains('repository') ||
+          pathLower.contains('repo')) {
         subFolder = 'integration_test';
       } else {
         subFolder = 'unit_test';

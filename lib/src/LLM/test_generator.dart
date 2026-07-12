@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:math';
-import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
+import 'package:flutter_test_gen_ai/src/LLM/model.dart';
+import 'package:flutter_test_gen_ai/src/LLM/prompt_generator.dart';
+import 'package:flutter_test_gen_ai/src/LLM/test_file.dart';
+import 'package:flutter_test_gen_ai/src/LLM/validator.dart';
 
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
@@ -126,7 +129,11 @@ class TestGenerator {
 
     Duration backoff = initialBackoff;
 
-    final TestFile testFile = TestFile(packagePath, fileName, subFolder: subFolder);
+    final TestFile testFile = TestFile(
+      packagePath,
+      fileName,
+      subFolder: subFolder,
+    );
 
     String prompt = promptGenerator.testCode(
       toBeTestedCode,

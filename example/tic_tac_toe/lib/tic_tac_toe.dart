@@ -107,22 +107,30 @@ class TicTacToe {
 
   // Check if the given row has a winning combination
   bool isRowWin(int row) {
-    return (grid[row][0] != ' ' && grid[row][0] == grid[row][1] && grid[row][1] == grid[row][2]);
+    return (grid[row][0] != ' ' &&
+        grid[row][0] == grid[row][1] &&
+        grid[row][1] == grid[row][2]);
   }
 
   // Check if the given column has a winning combination
   bool isColWin(int col) {
-    return (grid[0][col] != ' ' && grid[0][col] == grid[1][col] && grid[1][col] == grid[2][col]);
+    return (grid[0][col] != ' ' &&
+        grid[0][col] == grid[1][col] &&
+        grid[1][col] == grid[2][col]);
   }
 
   // Check if the first diagonal has a winning combination
   bool isDiag1Win() {
-    return (grid[0][0] != ' ' && grid[0][0] == grid[1][1] && grid[1][1] == grid[2][2]);
+    return (grid[0][0] != ' ' &&
+        grid[0][0] == grid[1][1] &&
+        grid[1][1] == grid[2][2]);
   }
 
   // Check if the second diagonal has a winning combination
   bool isDiag2Win() {
-    return (grid[0][2] != ' ' && grid[0][2] == grid[1][1] && grid[1][1] == grid[2][0]);
+    return (grid[0][2] != ' ' &&
+        grid[0][2] == grid[1][1] &&
+        grid[1][1] == grid[2][0]);
   }
 
   // Check if there are no more empty spaces in the grid
@@ -149,7 +157,9 @@ class Scanner {
         throw StateError("No more input");
       }
       _tokens.clear();
-      _tokens.addAll(line.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty));
+      _tokens.addAll(
+        line.trim().split(RegExp(r'\s+')).where((t) => t.isNotEmpty),
+      );
       _tokenIndex = 0;
     }
     return int.parse(_tokens[_tokenIndex++]);

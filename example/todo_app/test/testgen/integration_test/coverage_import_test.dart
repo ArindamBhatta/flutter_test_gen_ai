@@ -6,4 +6,4 @@ import 'package:my_web_app/todo_cubit.dart';
 import 'package:my_web_app/todo_service.dart';
 import 'package:my_web_app/todo_model.dart';
 
-void main(){}
+void main() {}

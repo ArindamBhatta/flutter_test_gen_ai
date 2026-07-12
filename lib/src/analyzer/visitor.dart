@@ -3,7 +3,7 @@
 import 'package:analyzer/dart/ast/ast.dart' as ast;
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:flutter_test_gen_ai/flutter_test_gen_ai.dart';
+import 'package:flutter_test_gen_ai/src/analyzer/declaration.dart';
 
 class DependencyVisitor extends RecursiveAstVisitor<void> {
   final ast.Declaration astNode;
@@ -158,8 +158,10 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
 
       if (labelArg != null) {
         // Extract the literal value of the label (e.g., 'login_button')
-        final labelVal =
-            labelArg.expression.toString().replaceAll(RegExp("['\"]"), '');
+        final labelVal = labelArg.expression.toString().replaceAll(
+          RegExp("['\"]"),
+          '',
+        );
         elements.add({
           'label': labelVal,
           'type': isButton ? 'button' : 'element',
@@ -178,10 +180,7 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
 
     if (keyArg != null) {
       final keyVal = keyArg.expression.toString();
-      elements.add({
-        'key': keyVal,
-        'type': 'widget_key',
-      });
+      elements.add({'key': keyVal, 'type': 'widget_key'});
     }
 
     super.visitInstanceCreationExpression(node);
