@@ -300,322 +300,336 @@ Future<void> main(List<String> arguments) async {
     );
   });
 
-  // Step 1: Parse arguments and configure runtime environment
-  final Flags flags = await perseArgs(arguments);
+  try {
+    // Step 1: Parse arguments and configure runtime environment
+    final Flags flags = await perseArgs(arguments);
 
-  _logger.info("Flags package path are ${flags.package}");
-  _logger.info("Flags vm service port are ${flags.vmServicePort}");
-  _logger.info("Flags target files are ${flags.targetFiles}");
+    _logger.info("Flags package path are ${flags.package}");
+    _logger.info("Flags vm service port are ${flags.vmServicePort}");
+    _logger.info("Flags target files are ${flags.targetFiles}");
 
-  _logger.info("Flags branch coverage are ${flags.branchCoverage}");
-  _logger.info("Flags function coverage are ${flags.functionCoverage}");
-  _logger.info("Flags scope output are ${flags.scopeOutput}");
+    _logger.info("Flags branch coverage are ${flags.branchCoverage}");
+    _logger.info("Flags function coverage are ${flags.functionCoverage}");
+    _logger.info("Flags scope output are ${flags.scopeOutput}");
 
-  _logger.info("Flags verbose are ${flags.verbose}");
+    _logger.info("Flags verbose are ${flags.verbose}");
 
-  if (flags.verbose) {
-    Logger.root.level = Level.FINE;
-  }
-
-  // Step 2: Read dependencies and check if the 'test' library is installed
-  //🚀 Dependencies are  🚀  🚀 [path, lints, test, flutter_test_gen_ai]
-
-  final List<String> deps = getPackageDependencies(flags.package);
-
-  _logger.info('Dependencies are  🚀  🚀 $deps');
-
-  // The 'test' library is required to run generated tests.
-  // If not found in the project's pubspec.yaml, we add it automatically.
-  if (!deps.contains('test')) {
-    _logger.info(
-      '"test" package not found in dependencies. Running "dart pub add test --dev"...',
-    );
-    final process = await Process.run('dart', [
-      'pub',
-      'add',
-      'test',
-      '--dev',
-    ], workingDirectory: flags.package);
-    if (process.exitCode != 0) {
-      _logger.shout('Failed to run dart pub add test --dev: ${process.stderr}');
-      exit(1);
+    if (flags.verbose) {
+      Logger.root.level = Level.FINE;
     }
-    _logger.info('Successfully added "test" dev dependency.');
-  }
 
-  // Step 3: Start with dynamic layer. Run initial tests and get json
-  final Map<String, dynamic> coverage = await runTestsAndCollectCoverage(
-    flags.package, //absolute path of the package
-    vmServicePort: flags.vmServicePort, //port number 0
-    branchCoverage: flags.branchCoverage, //[]
-    functionCoverage: flags.functionCoverage, //false
-    scopeOutput: flags.scopeOutput, //{tic_tac_toe}
-  );
+    // Step 2: Read dependencies and check if the 'test' library is installed
+    //🚀 Dependencies are  🚀  🚀 [path, lints, test, flutter_test_gen_ai]
 
-  // Format Json to CoverageData
-  final CoverageData coverageByFile = await formatCoverage(
-    coverage,
-    flags.package,
-  );
+    final List<String> deps = getPackageDependencies(flags.package);
 
-  // Step 4: Start with Static layer. Extract all code declarations
-  final List<Declaration> declarations = await extractDeclarations(
-    flags.package,
-    targetFiles: flags.targetFiles,
-  );
+    _logger.info('Dependencies are  🚀  🚀 $deps');
 
-  _logger.info(
-    "Extracted ${declarations.length} declarations from the package",
-  );
-
-  // Automatically check if we need to add bloc_test to dev_dependencies
-  final bool hasBloc = declarations.any((decl) => decl.isBloc || decl.isCubit);
-  if (hasBloc) {
-    if (!deps.contains('bloc_test')) {
+    // The 'test' library is required to run generated tests.
+    // If not found in the project's pubspec.yaml, we add it automatically.
+    if (!deps.contains('test')) {
       _logger.info(
-        'Bloc/Cubit declaration detected but "bloc_test" is not in dependencies. '
-        'Running "dart pub add bloc_test --dev" to support bloc testing...',
+        '"test" package not found in dependencies. Running "dart pub add test --dev"...',
       );
       final process = await Process.run('dart', [
         'pub',
         'add',
-        'bloc_test',
+        'test',
         '--dev',
       ], workingDirectory: flags.package);
       if (process.exitCode != 0) {
-        _logger.shout(
-          'Failed to run dart pub add bloc_test --dev: ${process.stderr}',
+        _logger.shout('Failed to run dart pub add test --dev: ${process.stderr}');
+        exit(1);
+      }
+      _logger.info('Successfully added "test" dev dependency.');
+    }
+
+    // Step 3: Start with dynamic layer. Run initial tests and get json
+    final Map<String, dynamic> coverage = await runTestsAndCollectCoverage(
+      flags.package, //absolute path of the package
+      vmServicePort: flags.vmServicePort, //port number 0
+      branchCoverage: flags.branchCoverage, //[]
+      functionCoverage: flags.functionCoverage, //false
+      scopeOutput: flags.scopeOutput, //{tic_tac_toe}
+    );
+
+    // Format Json to CoverageData
+    final CoverageData coverageByFile = await formatCoverage(
+      coverage,
+      flags.package,
+    );
+
+    // Step 4: Start with Static layer. Extract all code declarations
+    final List<Declaration> declarations = await extractDeclarations(
+      flags.package,
+      targetFiles: flags.targetFiles,
+    );
+
+    _logger.info(
+      "Extracted ${declarations.length} declarations from the package",
+    );
+
+    // Automatically check if we need to add bloc_test to dev_dependencies
+    final bool hasBloc = declarations.any((decl) => decl.isBloc || decl.isCubit);
+    if (hasBloc) {
+      if (!deps.contains('bloc_test')) {
+        _logger.info(
+          'Bloc/Cubit declaration detected but "bloc_test" is not in dependencies. '
+          'Running "dart pub add bloc_test --dev" to support bloc testing...',
         );
-      } else {
-        _logger.info('Successfully added "bloc_test" dev dependency.');
-        deps.add('bloc_test');
-      }
-    }
-  }
-
-  // Group the declarations by the file they belong to
-  final Map<String, List<Declaration>> declarationsByFile = {};
-
-  //Loop through each declaration and add it to the map
-  for (final declaration in declarations) {
-    final String path = declaration.path;
-
-    // If the key doesn't exist, initialize it with an empty list
-    if (!declarationsByFile.containsKey(path)) {
-      declarationsByFile[path] = [];
-    }
-    // Add the declaration to the list associated with its path
-    declarationsByFile[path]!.add(declaration);
-  }
-  // _logger.info("Declarations by file static layer 📚 📚 📚  : $declarationsByFile");
-
-  // Step 5: Create a Record of all the Identify untested or partially tested declarations by cross-referencing with the baseline coverage report in dynamic layer.
-  List<(Declaration, List<int>)> untestedDeclarations =
-      extractUntestedDeclarations(declarationsByFile, coverageByFile);
-
-  //Todo: check this
-  final List<(Declaration, List<int>)> initialUntestedDeclarations = List.from(
-    untestedDeclarations,
-  );
-
-  _logger.info(
-    ' 📚 📚 📚 Found ${untestedDeclarations.length} untested/partially tested declarations.',
-  );
-
-  // Step 6: Initialize Gemini model and test generation framework
-  final GeminiModel model = GeminiModel(
-    modelName: flags.model,
-    apiKey: flags.apiKey,
-  );
-  //call to generate tests
-  final TestGenerator testGenerator = TestGenerator(
-    model: model, //GeminiModel
-    packagePath: flags.package,
-    maxRetries: flags.maxAttempts,
-    verbose: flags.verbose,
-  );
-
-  // Keep track of declarations that failed or were skipped to avoid infinite loops
-  final skippedOrFailedDeclarations = HashSet<int>();
-
-  // Shuffle untested declarations to randomize the order in which we build tests
-  untestedDeclarations.shuffle();
-
-  //Step 7: Iterate through each untested declaration, generate tests, and validate them
-  while (untestedDeclarations.isNotEmpty) {
-    // Find the next declaration that we haven't skipped/failed yet
-    final idx = untestedDeclarations.indexWhere(
-      (pair) => !skippedOrFailedDeclarations.contains(pair.$1.id),
-    );
-
-    // If all remaining declarations have been skipped/failed, break the loop
-    if (idx == -1) {
-      _logger.info(
-        'No more declarations can be processed. Terminating test generation loop.',
-      );
-      break;
-    }
-
-    final remainingCount =
-        untestedDeclarations.length - skippedOrFailedDeclarations.length;
-
-    _logger.info('Untested declarations remaining: $remainingCount');
-
-    // Retrieve the declaration and the list of uncovered lines
-    final (declaration, lines) = untestedDeclarations[idx];
-    _logger.info(
-      'Selected Target: "${declaration.name}" (ID: ${declaration.id}) in ${path.relative(declaration.path, from: flags.package)}',
-    );
-    _logger.info('Uncovered lines for this declaration: $lines');
-
-    // Format the code block for the selected declaration
-    final toBeTestedCode = formatUntestedCode(declaration, lines);
-
-    // Step 7a: Collect references & dependencies of this declaration (BFS/DFS traversal of AST)
-    // This gives the LLM context about other classes/methods used by this code, enabling it
-    // to write valid tests without mock errors.
-    _logger.info(
-      'Analyzing dependency context for "${declaration.name}" up to depth of ${flags.maxDepth}...',
-    );
-    final contextMap = buildDependencyContext(
-      declaration,
-      maxDepth: flags.maxDepth,
-    );
-
-    // Format context mapping for injection into the LLM prompt
-    final contextCode = formatContext(contextMap);
-    _logger.info('Dependency context generated successfully.');
-
-    // Step 7b: Query the LLM to generate tests
-    _logger.info('Sending request to Gemini LLM to generate tests...');
-
-    String? hint;
-    if (declaration.isBloc) {
-      hint =
-          'This class is a Bloc. Use the "bloc_test" package to write tests for it. '
-          'Avoid calling handlers or states manually when "blocTest" is more appropriate. '
-          'Do not mock the bloc itself; mock its dependencies instead.';
-    } else if (declaration.isCubit) {
-      hint =
-          'This class is a Cubit. Use the "bloc_test" package to write tests for it. '
-          'Specifically, use "blocTest" from the "bloc_test" package to assert states emitted. '
-          'Do not mock the cubit itself; mock its dependencies instead.';
-    } else if (declaration.isRiverpod) {
-      hint =
-          'This class is a Riverpod Notifier/StateNotifier. '
-          'Please test it using standard Riverpod unit testing conventions, '
-          'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
-          'Make sure to dispose the ProviderContainer at the end of the test.';
-    } else if (declaration.isWidget) {
-      hint = testGenerator.promptGenerator.widgetPromptHint(
-        declaration.uiElements,
-      );
-    }
-
-    String? subFolder;
-    if (declaration.isWidget) {
-      subFolder = 'widget_test';
-    } else {
-      final pathLower = declaration.path.toLowerCase();
-      if (pathLower.contains('service') ||
-          pathLower.contains('repository') ||
-          pathLower.contains('repo')) {
-        subFolder = 'integration_test';
-      } else {
-        subFolder = 'unit_test';
+        final process = await Process.run('dart', [
+          'pub',
+          'add',
+          'bloc_test',
+          '--dev',
+        ], workingDirectory: flags.package);
+        if (process.exitCode != 0) {
+          _logger.shout(
+            'Failed to run dart pub add bloc_test --dev: ${process.stderr}',
+          );
+        } else {
+          _logger.info('Successfully added "bloc_test" dev dependency.');
+          deps.add('bloc_test');
+        }
       }
     }
 
-    //call Generate method
-    final result = await testGenerator.generate(
-      toBeTestedCode: toBeTestedCode,
-      contextCode: contextCode,
-      fileName:
-          '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
-      hint: hint,
-      subFolder: subFolder,
+    // Group the declarations by the file they belong to
+    final Map<String, List<Declaration>> declarationsByFile = {};
+
+    //Loop through each declaration and add it to the map
+    for (final declaration in declarations) {
+      final String path = declaration.path;
+
+      // If the key doesn't exist, initialize it with an empty list
+      if (!declarationsByFile.containsKey(path)) {
+        declarationsByFile[path] = [];
+      }
+      // Add the declaration to the list associated with its path
+      declarationsByFile[path]!.add(declaration);
+    }
+    // _logger.info("Declarations by file static layer 📚 📚 📚  : $declarationsByFile");
+
+    // Step 5: Create a Record of all the Identify untested or partially tested declarations by cross-referencing with the baseline coverage report in dynamic layer.
+    List<(Declaration, List<int>)> untestedDeclarations =
+        extractUntestedDeclarations(declarationsByFile, coverageByFile);
+
+    //Todo: check this
+    final List<(Declaration, List<int>)> initialUntestedDeclarations = List.from(
+      untestedDeclarations,
     );
 
-    _logger.info('LLM response received. Status: ${result.status}');
-    bool isTestDeleted = result.status != TestStatus.created;
+    _logger.info(
+      ' 📚 📚 📚 Found ${untestedDeclarations.length} untested/partially tested declarations.',
+    );
 
-    // Step 7c: If --effective-tests-only is enabled, we run the suite and verify
-    // if code coverage actually improved. If it didn't, we discard the generated test file.
-    if (flags.effectiveTestsOnly && result.status == TestStatus.created) {
-      _logger.info(
-        'Validation: Checking if the generated test increases code coverage...',
+    // Step 6: Initialize Gemini model and test generation framework
+    final GeminiModel model = GeminiModel(
+      modelName: flags.model,
+      apiKey: flags.apiKey,
+    );
+    //call to generate tests
+    final TestGenerator testGenerator = TestGenerator(
+      model: model, //GeminiModel
+      packagePath: flags.package,
+      maxRetries: flags.maxAttempts,
+      verbose: flags.verbose,
+    );
+
+    // Keep track of declarations that failed or were skipped to avoid infinite loops
+    final skippedOrFailedDeclarations = HashSet<int>();
+
+    // Shuffle untested declarations to randomize the order in which we build tests
+    untestedDeclarations.shuffle();
+
+    //Step 7: Iterate through each untested declaration, generate tests, and validate them
+    while (untestedDeclarations.isNotEmpty) {
+      // Find the next declaration that we haven't skipped/failed yet
+      final idx = untestedDeclarations.indexWhere(
+        (pair) => !skippedOrFailedDeclarations.contains(pair.$1.id),
       );
-      final isImproved = await validateTestCoverageImprovement(
-        declaration: declaration,
-        baselineUncoveredLines: lines.length,
-        packageDir: flags.package,
-        scopeOutput: flags.scopeOutput,
+
+      // If all remaining declarations have been skipped/failed, break the loop
+      if (idx == -1) {
+        _logger.info(
+          'No more declarations can be processed. Terminating test generation loop.',
+        );
+        break;
+      }
+
+      final remainingCount =
+          untestedDeclarations.length - skippedOrFailedDeclarations.length;
+
+      _logger.info('Untested declarations remaining: $remainingCount');
+
+      // Retrieve the declaration and the list of uncovered lines
+      final (declaration, lines) = untestedDeclarations[idx];
+      _logger.info(
+        'Selected Target: "${declaration.name}" (ID: ${declaration.id}) in ${path.relative(declaration.path, from: flags.package)}',
+      );
+      _logger.info('Uncovered lines for this declaration: $lines');
+
+      // Format the code block for the selected declaration
+      final toBeTestedCode = formatUntestedCode(declaration, lines);
+
+      // Step 7a: Collect references & dependencies of this declaration (BFS/DFS traversal of AST)
+      // This gives the LLM context about other classes/methods used by this code, enabling it
+      // to write valid tests without mock errors.
+      _logger.info(
+        'Analyzing dependency context for "${declaration.name}" up to depth of ${flags.maxDepth}...',
+      );
+      final contextMap = buildDependencyContext(
+        declaration,
+        maxDepth: flags.maxDepth,
+      );
+
+      // Format context mapping for injection into the LLM prompt
+      final contextCode = formatContext(contextMap);
+      _logger.info('Dependency context generated successfully.');
+
+      // Step 7b: Query the LLM to generate tests
+      _logger.info('Sending request to Gemini LLM to generate tests...');
+
+      String? hint;
+      if (declaration.isBloc) {
+        hint =
+            'This class is a Bloc. Use the "bloc_test" package to write tests for it. '
+            'Avoid calling handlers or states manually when "blocTest" is more appropriate. '
+            'Do not mock the bloc itself; mock its dependencies instead.';
+      } else if (declaration.isCubit) {
+        hint =
+            'This class is a Cubit. Use the "bloc_test" package to write tests for it. '
+            'Specifically, use "blocTest" from the "bloc_test" package to assert states emitted. '
+            'Do not mock the cubit itself; mock its dependencies instead.';
+      } else if (declaration.isRiverpod) {
+        hint =
+            'This class is a Riverpod Notifier/StateNotifier. '
+            'Please test it using standard Riverpod unit testing conventions, '
+            'specifically by creating a ProviderContainer, reading the provider, and verifying state transitions. '
+            'Make sure to dispose the ProviderContainer at the end of the test.';
+      } else if (declaration.isWidget) {
+        hint = testGenerator.promptGenerator.widgetPromptHint(
+          declaration.uiElements,
+        );
+      }
+
+      String? subFolder;
+      if (declaration.isWidget) {
+        subFolder = 'widget_test';
+      } else {
+        final pathLower = declaration.path.toLowerCase();
+        if (pathLower.contains('service') ||
+            pathLower.contains('repository') ||
+            pathLower.contains('repo')) {
+          subFolder = 'integration_test';
+        } else {
+          subFolder = 'unit_test';
+        }
+      }
+
+      //call Generate method
+      final result = await testGenerator.generate(
+        toBeTestedCode: toBeTestedCode,
+        contextCode: contextCode,
+        fileName:
+            '${declaration.name}_${declaration.id}_${lines.length}_test.dart',
+        hint: hint,
+        subFolder: subFolder,
+      );
+
+      _logger.info('LLM response received. Status: ${result.status}');
+      bool isTestDeleted = result.status != TestStatus.created;
+
+      // Step 7c: If --effective-tests-only is enabled, we run the suite and verify
+      // if code coverage actually improved. If it didn't, we discard the generated test file.
+      if (flags.effectiveTestsOnly && result.status == TestStatus.created) {
+        _logger.info(
+          'Validation: Checking if the generated test increases code coverage...',
+        );
+        final isImproved = await validateTestCoverageImprovement(
+          declaration: declaration,
+          baselineUncoveredLines: lines.length,
+          packageDir: flags.package,
+          scopeOutput: flags.scopeOutput,
+          vmServicePort: flags.vmServicePort,
+          branchCoverage: flags.branchCoverage,
+          functionCoverage: flags.functionCoverage,
+        );
+
+        if (!isImproved) {
+          _logger.info(
+            'Validation Outcome: Test did not improve coverage. Deleting generated test file.',
+          );
+          await result.testFile.deleteTest();
+          isTestDeleted = true;
+        } else {
+          _logger.info(
+            'Validation Outcome: Success! Code coverage increased. Keeping test file: ${result.testFile.testFilePath}',
+          );
+        }
+      }
+
+      // Step 7d: Re-run tests to collect updated coverage map
+      _logger.info('Re-running tests to collect new coverage metrics...');
+      final newCoverage = await runTestsAndCollectCoverage(
+        flags.package,
         vmServicePort: flags.vmServicePort,
         branchCoverage: flags.branchCoverage,
         functionCoverage: flags.functionCoverage,
+        scopeOutput: flags.scopeOutput,
+        isInternalCall: true,
       );
 
-      if (!isImproved) {
+      final newCoverageByFile = await formatCoverage(newCoverage, flags.package);
+
+      // If the test was successfully kept, update our listing of untested declarations
+      if (result.status == TestStatus.created && !isTestDeleted) {
         _logger.info(
-          'Validation Outcome: Test did not improve coverage. Deleting generated test file.',
+          'Updating list of untested declarations with new coverage data.',
         );
-        await result.testFile.deleteTest();
-        isTestDeleted = true;
+        untestedDeclarations = extractUntestedDeclarations(
+          declarationsByFile,
+          newCoverageByFile,
+        );
       } else {
+        // Otherwise mark this declaration as skipped/failed to avoid trying it again
         _logger.info(
-          'Validation Outcome: Success! Code coverage increased. Keeping test file: ${result.testFile.testFilePath}',
+          'Marking declaration "${declaration.name}" as skipped/failed to avoid re-tries.',
         );
+        skippedOrFailedDeclarations.add(declaration.id);
       }
     }
 
-    // Step 7d: Re-run tests to collect updated coverage map
-    _logger.info('Re-running tests to collect new coverage metrics...');
-    final newCoverage = await runTestsAndCollectCoverage(
-      flags.package,
-      vmServicePort: flags.vmServicePort,
-      branchCoverage: flags.branchCoverage,
-      functionCoverage: flags.functionCoverage,
-      scopeOutput: flags.scopeOutput,
-      isInternalCall: true,
-    );
+    // Clean up test generator resources
+    _logger.info('Step 8: Disposing test generator and cleaning up...');
+    await testGenerator.dispose();
 
-    final newCoverageByFile = await formatCoverage(newCoverage, flags.package);
-
-    // If the test was successfully kept, update our listing of untested declarations
-    if (result.status == TestStatus.created && !isTestDeleted) {
+    if (flags.generateReport) {
+      _logger.info('Generating coverage and dependency report...');
+      final report = MermaidReporter.generateReport(
+        allDeclarations: declarations,
+        initialUntested: initialUntestedDeclarations,
+        finalUntested: untestedDeclarations,
+      );
+      await MermaidReporter.writeReport(flags.package, report);
       _logger.info(
-        'Updating list of untested declarations with new coverage data.',
+        'Report generated successfully at: ${flags.package}/testgen_report.md',
       );
-      untestedDeclarations = extractUntestedDeclarations(
-        declarationsByFile,
-        newCoverageByFile,
-      );
-    } else {
-      // Otherwise mark this declaration as skipped/failed to avoid trying it again
-      _logger.info(
-        'Marking declaration "${declaration.name}" as skipped/failed to avoid re-tries.',
-      );
-      skippedOrFailedDeclarations.add(declaration.id);
     }
+
+    _logger.info('Process finished successfully.');
+    exit(0);
+  } on ProcessException catch (e) {
+    _logger.severe('ProcessException occurred while running command:');
+    _logger.severe('  Command: ${e.executable} ${e.arguments.join(' ')}');
+    _logger.severe('  Exit Code: ${e.errorCode}');
+    if (e.message.isNotEmpty) {
+      _logger.severe('  Details:\n${e.message}');
+    }
+    exit(1);
+  } catch (e, stackTrace) {
+    _logger.severe('An unexpected error occurred: $e');
+    _logger.severe(stackTrace.toString());
+    exit(1);
   }
-
-  // Clean up test generator resources
-  _logger.info('Step 8: Disposing test generator and cleaning up...');
-  await testGenerator.dispose();
-
-  if (flags.generateReport) {
-    _logger.info('Generating coverage and dependency report...');
-    final report = MermaidReporter.generateReport(
-      allDeclarations: declarations,
-      initialUntested: initialUntestedDeclarations,
-      finalUntested: untestedDeclarations,
-    );
-    await MermaidReporter.writeReport(flags.package, report);
-    _logger.info(
-      'Report generated successfully at: ${flags.package}/testgen_report.md',
-    );
-  }
-
-  _logger.info('Process finished successfully.');
-  exit(0);
 }

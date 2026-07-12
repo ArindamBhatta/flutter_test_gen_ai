@@ -103,10 +103,23 @@ Future<Map<String, dynamic>> _collectCoverageViaLcov(String packageDir) async {
 
   // We should accept exit codes 0 and 79 (no tests found)
   if (result.exitCode != 0 && result.exitCode != 79) {
+    final String stdErrStr = result.stderr.toString().trim();
+    final String stdOutStr = result.stdout.toString().trim();
+    final StringBuffer message = StringBuffer();
+    if (stdErrStr.isNotEmpty) {
+      message.writeln('STDERR:\n$stdErrStr');
+    }
+    if (stdOutStr.isNotEmpty) {
+      if (message.isNotEmpty) message.writeln();
+      message.writeln('STDOUT:\n$stdOutStr');
+    }
+    if (message.isEmpty) {
+      message.write('Process exited with code ${result.exitCode} without output.');
+    }
     throw ProcessException(
       'flutter',
       ['test', '--coverage'],
-      result.stderr.toString(),
+      message.toString(),
       result.exitCode,
     );
   }
