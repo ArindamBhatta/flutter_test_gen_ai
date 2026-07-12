@@ -1,5 +1,5 @@
 # TestGen Coverage & Dependency Report
-Generated on: 2026-07-12 11:31:57 UTC
+Generated on: 2026-07-12 11:54:15 UTC
 
 ## Summary of Test Generation
 - **Total Declarations:** 17
@@ -52,3 +52,13 @@ graph LR
 - ✅ `_tokens`
 - ✅ `_tokenIndex`
 - ❌ `nextInt` (Lines: [0, 1, 2, 4, 6, 7, 8, 10, 12])
+
+---
+## ⚠️ Why Do Some Declarations Remain Untested?
+If a class or method remains marked with a red `❌` under **Needs Coverage**, it means the test generator attempted to create tests but they failed validation and were discarded. Common reasons include:
+
+1. **Hardcoded Global I/O / System Calls**: Code referencing global resources directly (e.g., `stdin.readLineSync()`, static database instances, or network sockets) will crash or hang when run headlessly in the test runner. **Fix**: Refactor to use Dependency Injection (e.g., pass an input reader/client to the constructor).
+
+2. **Platform Channels**: Code calling native Android/iOS APIs (via MethodChannels) without matching mock values in the test setup. **Fix**: Mock the method channel responses in a setup block.
+
+3. **No Coverage Improvement**: The tests compiled and ran successfully, but did not exercise any previously uncovered lines. If `--effective-tests-only` is active, these redundant tests are deleted to keep your test suite clean.

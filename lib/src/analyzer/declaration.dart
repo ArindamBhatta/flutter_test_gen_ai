@@ -353,6 +353,30 @@ class MermaidReporter {
       }
     }
 
+    buffer.writeln('\n---');
+    buffer.writeln('## ⚠️ Why Do Some Declarations Remain Untested?');
+    buffer.writeln(
+      'If a class or method remains marked with a red `❌` under **Needs Coverage**, '
+      'it means the test generator attempted to create tests but they failed validation '
+      'and were discarded. Common reasons include:\n',
+    );
+    buffer.writeln(
+      '1. **Hardcoded Global I/O / System Calls**: Code referencing global resources '
+      'directly (e.g., `stdin.readLineSync()`, static database instances, or network sockets) '
+      'will crash or hang when run headlessly in the test runner. '
+      '**Fix**: Refactor to use Dependency Injection (e.g., pass an input reader/client to the constructor).\n',
+    );
+    buffer.writeln(
+      '2. **Platform Channels**: Code calling native Android/iOS APIs (via MethodChannels) '
+      'without matching mock values in the test setup. '
+      '**Fix**: Mock the method channel responses in a setup block.\n',
+    );
+    buffer.writeln(
+      '3. **No Coverage Improvement**: The tests compiled and ran successfully, '
+      'but did not exercise any previously uncovered lines. If `--effective-tests-only` is active, '
+      'these redundant tests are deleted to keep your test suite clean.',
+    );
+
     return buffer.toString();
   }
 
