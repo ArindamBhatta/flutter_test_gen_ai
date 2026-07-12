@@ -116,8 +116,11 @@ class CompoundDependencyVisitor extends DependencyVisitor {
 
   @override
   void visitExtensionTypeDeclaration(ast.ExtensionTypeDeclaration node) {
-    // target type of the extension type
-    node.representation.accept(this);
+    final namePart = node.namePart;
+    if (namePart is ast.PrimaryConstructorDeclaration) {
+      final parameter = namePart.formalParameters.parameters.firstOrNull;
+      parameter?.accept(this);
+    }
 
     _visitImplementsClause(node.implementsClause);
   }
@@ -132,9 +135,9 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
 
     // 1. Check for Semantics widgets
     if (constructorName == 'Semantics') {
-      ast.NamedExpression? labelArg;
+      ast.NamedArgument? labelArg;
       for (final arg in node.argumentList.arguments) {
-        if (arg is ast.NamedExpression && arg.name.label.name == 'label') {
+        if (arg is ast.NamedArgument && arg.name.lexeme == 'label') {
           labelArg = arg;
           break;
         }
@@ -142,9 +145,9 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
 
       bool isButton = false;
       for (final arg in node.argumentList.arguments) {
-        if (arg is ast.NamedExpression &&
-            arg.name.label.name == 'button' &&
-            arg.expression.toString() == 'true') {
+        if (arg is ast.NamedArgument &&
+            arg.name.lexeme == 'button' &&
+            arg.argumentExpression.toString() == 'true') {
           isButton = true;
           break;
         }
@@ -152,7 +155,7 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
 
       if (labelArg != null) {
         // Extract the literal value of the label (e.g., 'login_button')
-        final labelVal = labelArg.expression.toString().replaceAll(
+        final labelVal = labelArg.argumentExpression.toString().replaceAll(
           RegExp("['\"]"),
           '',
         );
@@ -164,16 +167,16 @@ class WidgetVisitor extends RecursiveAstVisitor<void> {
     }
 
     // 2. Check for widget Keys (e.g., Key('email_field'))
-    ast.NamedExpression? keyArg;
+    ast.NamedArgument? keyArg;
     for (final arg in node.argumentList.arguments) {
-      if (arg is ast.NamedExpression && arg.name.label.name == 'key') {
+      if (arg is ast.NamedArgument && arg.name.lexeme == 'key') {
         keyArg = arg;
         break;
       }
     }
 
     if (keyArg != null) {
-      final keyVal = keyArg.expression.toString();
+      final keyVal = keyArg.argumentExpression.toString();
       elements.add({'key': keyVal, 'type': 'widget_key'});
     }
 

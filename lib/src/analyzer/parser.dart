@@ -1,6 +1,7 @@
 import 'package:analyzer/source/line_info.dart';
 import 'package:logging/logging.dart';
 import 'package:analyzer/dart/ast/ast.dart' as ast;
+import 'package:analyzer/dart/ast/token.dart';
 
 import 'declaration.dart';
 import 'visitor.dart';
@@ -29,11 +30,11 @@ void parseCompilationUnit(
         );
         break;
 
-      case ast.ExtensionDeclaration() ||
-          ast.ClassDeclaration() ||
+      case ast.ClassDeclaration() ||
           ast.MixinDeclaration() ||
           ast.EnumDeclaration() ||
-          ast.ExtensionDeclaration():
+          ast.ExtensionDeclaration() ||
+          ast.ExtensionTypeDeclaration():
         _parseCompoundDeclaration(
           member,
           visitedDeclarations,
@@ -44,7 +45,7 @@ void parseCompilationUnit(
         );
         break;
 
-      case ast.NamedCompilationUnitMember():
+      case ast.FunctionDeclaration() || ast.TypeAlias():
         _parseNamedCompilationUnitMember(
           member,
           visitedDeclarations,
@@ -159,16 +160,16 @@ void _parseCompoundDeclaration(
   String content,
 ) {
   final (String? name, List<ast.ClassMember> members) = switch (declaration) {
-    ast.ClassDeclaration(:final name, :final members) => (name.lexeme, members),
-    ast.MixinDeclaration(:final name, :final members) => (name.lexeme, members),
-    ast.EnumDeclaration(:final name, :final members) => (name.lexeme, members),
-    ast.ExtensionTypeDeclaration(:final name, :final members) => (
-      name.lexeme,
-      members,
+    ast.ClassDeclaration(:final namePart, :final body) => (namePart.typeName.lexeme, body.members),
+    ast.MixinDeclaration(:final name, :final body) => (name.lexeme, body.members),
+    ast.EnumDeclaration(:final namePart, :final body) => (namePart.typeName.lexeme, body.members),
+    ast.ExtensionTypeDeclaration(:final namePart, :final body) => (
+      namePart.typeName.lexeme,
+      body.members,
     ),
-    ast.ExtensionDeclaration(:final name, :final members) => (
+    ast.ExtensionDeclaration(:final name, :final body) => (
       name?.lexeme,
-      members,
+      body.members,
     ),
     _ => ('', []),
   };
@@ -251,7 +252,7 @@ void _parseCompoundDeclaration(
 }
 
 void _parseNamedCompilationUnitMember(
-  ast.NamedCompilationUnitMember member,
+  ast.CompilationUnitMember member,
   Map<int, Declaration> visitedDeclarations,
   Map<int, List<Declaration>> dependencies,
   LineInfo lineInfo,
@@ -259,13 +260,18 @@ void _parseNamedCompilationUnitMember(
   String content,
 ) {
   // NamedCompilationUnitMember includes top-level functions and type aliases
-  _logger.fine('Parsing named compilation unit member: ${member.name.lexeme}');
+  final Token nameToken = switch (member) {
+    ast.FunctionDeclaration(:final name) => name,
+    ast.TypeAlias(:final name) => name,
+    _ => throw ArgumentError('Unsupported named member: $member'),
+  };
+  _logger.fine('Parsing named compilation unit member: ${nameToken.lexeme}');
   final parsedDeclaration = _parseDeclaration(
     member,
     lineInfo,
     path,
     content,
-    name: member.name.lexeme,
+    name: nameToken.lexeme,
   );
   visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
   member.accept(DependencyVisitor(member, parsedDeclaration, dependencies));
@@ -281,7 +287,7 @@ void _parseClassMembers(
   Declaration parent,
 ) {
   for (final member in members) {
-    late Declaration parsedDeclaration;
+    Declaration? parsedDeclaration;
     switch (member) {
       case ast.MethodDeclaration():
         _logger.fine('Parsing method declaration: ${member.name.lexeme}');
@@ -309,6 +315,7 @@ void _parseClassMembers(
             groupEnd: member.end,
             parent: parent,
           );
+          visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
         }
         break;
 
@@ -326,9 +333,14 @@ void _parseClassMembers(
           parent: parent,
         );
         break;
+
+      default:
+        break;
     }
-    visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
-    member.accept(DependencyVisitor(member, parsedDeclaration, dependencies));
+    if (parsedDeclaration != null) {
+      visitedDeclarations[parsedDeclaration.id] = parsedDeclaration;
+      member.accept(DependencyVisitor(member, parsedDeclaration, dependencies));
+    }
   }
 }
 
@@ -341,7 +353,7 @@ void _parseEnumConstants(
   String content,
   Declaration parent,
 ) {
-  for (final constant in declaration.constants) {
+  for (final constant in declaration.body.constants) {
     _logger.fine('Parsing enum constant declaration: ${constant.name.lexeme}');
     final parsedDeclaration = _parseDeclaration(
       constant,

@@ -1,3 +1,8 @@
+## 0.2.1
+
+- Fixed analyzer API compatibility issues for newer Dart/Flutter SDKs.
+- Focused documentation and usage instructions purely on local CLI execution.
+
 ## 0.2.0
 
 - Added robust support for automated **Flutter Widget Testing**.

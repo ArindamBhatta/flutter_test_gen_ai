@@ -6,13 +6,19 @@ An intelligent, coverage-driven test generation CLI tool for Dart and Flutter ap
 
 ## ⚡ Quick Start
 
-### 1. Set the API Key
+### 1. Install the Package
+Add the tool to your Flutter/Dart project's `dev_dependencies`:
+```bash
+flutter pub add --dev flutter_test_gen_ai
+```
+
+### 2. Set the API Key
 Get a Google Gemini API Key and set it as an environment variable:
 ```bash
 export GEMINI_API_KEY="your-api-key-here"
 ```
 
-### 2. Run the Tool
+### 3. Run the Tool
 To scan and generate tests for your entire package:
 ```bash
 dart run flutter_test_gen_ai --api-key $GEMINI_API_KEY
